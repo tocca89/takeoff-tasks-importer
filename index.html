@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TakeOff CRM — Recurring Task Generator</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+    <!-- SheetJS (XLSX Parser) via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- Background Animated Gradients -->
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+    
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <i class="fa-solid fa-arrows-spin fa-spin-slow"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>TakeOff <span>Scheduler</span></h1>
+                    <p>Generatore Ricorrente di Task di Manutenzione</p>
+                </div>
+            </div>
+            <div class="header-status-area">
+                <div id="connection-badge" class="badge badge-disconnected">
+                    <span class="status-dot"></span>
+                    <span class="status-text">Disconnesso</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT -->
+        <main class="app-main-grid">
+            
+            <!-- LEFT COLUMN: CONTROLS & API -->
+            <div class="grid-column left-column">
+                
+                <!-- PANEL 1: AUTHENTICATION -->
+                <section class="glass-panel" id="auth-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-icon"><i class="fa-solid fa-key"></i></div>
+                        <h2>Autenticazione API</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <label for="api-key-input">Chiave API TakeOff CRM</label>
+                            <div class="input-with-action">
+                                <input type="password" id="api-key-input" placeholder="Inserisci la tua x-api-key..." autocomplete="off">
+                                <button type="button" id="btn-toggle-api-key" class="btn-icon" title="Mostra/Nascondi chiave">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                            <p class="field-hint">La chiave API verrà salvata localmente nel browser per i successivi accessi.</p>
+                        </div>
+                        <button type="button" id="btn-connect" class="btn btn-primary btn-full">
+                            <span class="btn-text">Connetti a TakeOff</span>
+                            <span class="btn-icon-right"><i class="fa-solid fa-circle-check"></i></span>
+                        </button>
+
+                        <!-- User Profile Info Card (Hidden initially) -->
+                        <div id="user-profile-card" class="user-card hidden">
+                            <div class="user-avatar" id="user-avatar">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <div class="user-details">
+                                <h3 id="user-display-name">Nome Utente</h3>
+                                <p id="user-role">Ruolo Aziendale</p>
+                                <span class="company-badge" id="user-company">Azienda</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL 2: TASK DEFAULTS -->
+                <section class="glass-panel disabled" id="defaults-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-icon"><i class="fa-solid fa-sliders"></i></div>
+                        <h2>Configurazione Task</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <label for="select-task-type">Tipo Task <span class="required">*</span></label>
+                            <select id="select-task-type" disabled>
+                                <option value="">Seleziona un tipo task...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="select-task-status">Stato Iniziale <span class="required">*</span></label>
+                            <select id="select-task-status" disabled>
+                                <option value="">Seleziona uno stato...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="select-assignee">Assegnatario di Default</label>
+                            <select id="select-assignee" disabled>
+                                <option value="">Nessuno (Non assegnato)</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-6">
+                                <label for="select-priority">Priorità</label>
+                                <select id="select-priority">
+                                    <option value="0">Bassa</option>
+                                    <option value="1" selected>Media</option>
+                                    <option value="2">Alta</option>
+                                </select>
+                            </div>
+                            <div class="form-group col-6">
+                                <label for="input-important">Importante</label>
+                                <div class="checkbox-wrapper">
+                                    <label class="switch">
+                                        <input type="checkbox" id="input-important">
+                                        <span class="slider round"></span>
+                                    </label>
+                                    <span class="switch-label">Segnala</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="expandable-trigger" id="templates-trigger">
+                            <span>Modelli Testi (Titolo & Descrizione)</span>
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </div>
+                        <div class="expandable-content hidden" id="templates-content">
+                            <div class="form-group">
+                                <label for="template-title">Template Titolo Task</label>
+                                <input type="text" id="template-title" value="Manutenzione periodica - {cliente}">
+                                <p class="field-hint">Variabili disponibili: <code>{cliente}</code>, <code>{codice}</code>, <code>{ricorrenza}</code>, <code>{data_attivazione}</code></p>
+                            </div>
+                            <div class="form-group">
+                                <label for="template-description">Template Descrizione Task</label>
+                                <textarea id="template-description" rows="3">Eseguire la manutenzione programmata periodica per il cliente {cliente}.&#10;&#10;Codice Cliente TakeOff: {codice}&#10;Ricorrenza programmata: {ricorrenza}&#10;Data inizio ciclo manutenzione: {data_attivazione}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- RIGHT COLUMN: EXCEL PARSER & GENERATOR PREVIEW -->
+            <div class="grid-column right-column">
+                
+                <!-- PANEL 3: EXCEL UPLOADER -->
+                <section class="glass-panel" id="excel-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-icon"><i class="fa-solid fa-file-excel"></i></div>
+                        <h2>Caricamento Lista Manutenzione</h2>
+                        <button type="button" id="btn-download-sample" class="btn btn-secondary btn-sm ml-auto">
+                            <i class="fa-solid fa-download"></i> Scarica Esempio
+                        </button>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Drag & Drop Zone -->
+                        <div class="drop-zone" id="excel-drop-zone">
+                            <div class="drop-zone-content">
+                                <i class="fa-solid fa-cloud-arrow-up drop-icon"></i>
+                                <h3>Trascina qui il file Excel di Manutenzione</h3>
+                                <p>oppure clicca per sfogliare i tuoi file (.xlsx, .xls)</p>
+                                <input type="file" id="excel-file-input" accept=".xlsx, .xls" class="hidden-file-input">
+                            </div>
+                        </div>
+
+                        <!-- Parse Success Info Block (Initially Hidden) -->
+                        <div id="excel-success-info" class="success-info-block hidden">
+                            <div class="info-icon"><i class="fa-solid fa-file-circle-check"></i></div>
+                            <div class="info-details">
+                                <h4 id="excel-filename">nome_file.xlsx</h4>
+                                <p id="excel-row-count">Trovati 0 clienti registrati nella lista.</p>
+                            </div>
+                            <button type="button" id="btn-reset-excel" class="btn-icon btn-reset" title="Rimuovi file">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+
+                        <!-- Interactive Column Mapping Panel (Initially Hidden) -->
+                        <div id="mapping-panel" class="mapping-container hidden">
+                            <h4><i class="fa-solid fa-arrows-left-right"></i> Mappatura Colonne Excel</h4>
+                            <p class="field-hint mb-3">Associa le colonne del tuo file Excel ai campi corretti dell'applicazione:</p>
+                            <div class="mapping-grid">
+                                <div class="mapping-row">
+                                    <span class="field-label">Codice Cliente (ID)</span>
+                                    <div class="select-wrapper">
+                                        <select id="map-customer-code"></select>
+                                    </div>
+                                </div>
+                                <div class="mapping-row">
+                                    <span class="field-label">Nome Cliente</span>
+                                    <div class="select-wrapper">
+                                        <select id="map-customer-name"></select>
+                                    </div>
+                                </div>
+                                <div class="mapping-row">
+                                    <span class="field-label">Codice Manutenzione</span>
+                                    <div class="select-wrapper">
+                                        <select id="map-recurrence"></select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL 4: GENERATOR PARAMETERS & TIMELINE PREVIEW -->
+                <section class="glass-panel disabled" id="generator-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                        <h2>Scadenziario Manutenzioni</h2>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Date range input parameters -->
+                        <div class="generator-config">
+                            <div class="form-row">
+                                <div class="form-group col-4">
+                                    <label for="input-start-date">Data Inizio Programma</label>
+                                    <input type="date" id="input-start-date" value="">
+                                </div>
+                                <div class="form-group col-4">
+                                    <label for="input-duration-months">Durata Generazione</label>
+                                    <div class="input-with-unit">
+                                        <input type="number" id="input-duration-months" value="12" min="1" max="60">
+                                        <span class="input-unit">Mesi</span>
+                                    </div>
+                                </div>
+                                <div class="form-group col-4 justify-end">
+                                    <button type="button" id="btn-generate-schedule" class="btn btn-accent btn-full">
+                                        <span class="btn-text">Genera Scadenze</span>
+                                        <span class="btn-icon-right"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Main Table/Card List of calculated Tasks -->
+                        <div id="schedule-preview-area" class="schedule-preview-area hidden">
+                            <div class="preview-toolbar">
+                                <div class="search-box">
+                                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                    <input type="text" id="preview-search" placeholder="Filtra per cliente o codice...">
+                                </div>
+                                <div class="toolbar-stats">
+                                    <span class="stat-badge"><strong id="stats-total-tasks">0</strong> Task Generati</span>
+                                    <span class="stat-badge success"><strong id="stats-selected-tasks">0</strong> Selezionati</span>
+                                </div>
+                            </div>
+
+                            <div class="table-container scrollable-y">
+                                <table class="preview-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-select"><input type="checkbox" id="select-all-tasks" checked></th>
+                                            <th class="col-client">Codice & Cliente</th>
+                                            <th class="col-badge">Freq.</th>
+                                            <th class="col-date">Data Attivazione</th>
+                                            <th class="col-range">Pianificazione (Fine Ciclo)</th>
+                                            <th class="col-title">Titolo del Task</th>
+                                            <th class="col-actions">Azioni</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="schedule-table-body">
+                                        <!-- Will be populated dynamically via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="action-footer">
+                                <button type="button" id="btn-bulk-create" class="btn btn-success btn-lg">
+                                    <span class="btn-text">Crea in Blocco su TakeOff CRM</span>
+                                    <span class="btn-icon-right"><i class="fa-solid fa-rocket"></i></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- BULK EXECUTION MONITOR MODAL -->
+    <div class="modal-overlay hidden" id="progress-modal">
+        <div class="modal-container glass-panel">
+            <div class="modal-header">
+                <h3>Creazione Task in Corso...</h3>
+                <span class="progress-ratio" id="progress-ratio">0 / 0</span>
+            </div>
+            <div class="modal-body">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progress-bar-fill" style="width: 0%;"></div>
+                </div>
+                
+                <div class="stats-grid">
+                    <div class="stat-box success">
+                        <span class="stat-label">Creati con Successo</span>
+                        <span class="stat-value" id="stats-success-count">0</span>
+                    </div>
+                    <div class="stat-box failure">
+                        <span class="stat-label">Errori / Falliti</span>
+                        <span class="stat-value" id="stats-failure-count">0</span>
+                    </div>
+                    <div class="stat-box speed">
+                        <span class="stat-label">Percentuale</span>
+                        <span class="stat-value" id="stats-percent">0%</span>
+                    </div>
+                </div>
+
+                <div class="log-console-container">
+                    <div class="console-header">
+                        <span>Registro delle operazioni API</span>
+                        <button type="button" id="btn-copy-logs" class="btn-icon-text" title="Copia log"><i class="fa-solid fa-copy"></i> Copia</button>
+                    </div>
+                    <div class="console-body" id="console-logs">
+                        <!-- Dynamic logs here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btn-stop-execution" class="btn btn-danger">Interrompi</button>
+                <button type="button" id="btn-close-progress" class="btn btn-secondary hidden">Chiudi</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT INDIVIDUAL TASK MODAL -->
+    <div class="modal-overlay hidden" id="edit-task-modal">
+        <div class="modal-container modal-sm glass-panel">
+            <div class="modal-header">
+                <h3>Modifica Scadenza Singola</h3>
+                <button type="button" id="btn-close-edit-modal" class="btn-icon-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-task-index">
+                <div class="form-group">
+                    <label for="edit-task-title">Titolo Task</label>
+                    <input type="text" id="edit-task-title">
+                </div>
+                <div class="form-group">
+                    <label for="edit-task-activation">Data Attivazione (Activation Date)</label>
+                    <input type="datetime-local" id="edit-task-activation">
+                </div>
+                <div class="form-group">
+                    <label for="edit-task-planned-start">Inizio Pianificazione (plannedStart)</label>
+                    <input type="date" id="edit-task-planned-start">
+                </div>
+                <div class="form-group">
+                    <label for="edit-task-planned-end">Fine Pianificazione (plannedEnd)</label>
+                    <input type="date" id="edit-task-planned-end">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btn-cancel-edit" class="btn btn-secondary">Annulla</button>
+                <button type="button" id="btn-save-edit" class="btn btn-accent">Salva Modifiche</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main JS Application Logic -->
+    <script src="app.js"></script>
+</body>
+</html>
