@@ -32,6 +32,10 @@ class TakeOffClient {
      * Get clean request URL based on proxy, fallback and environment settings.
      */
     getUrl(endpoint) {
+        if (this.useCorsProxy) {
+            return `https://corsproxy.io/?https://webapi.takeoffcrm.com${endpoint}`;
+        }
+
         if (window.location.hostname.endsWith('.vercel.app')) {
             // On Vercel, the base URL is /api/takeoff, and vercel.json transparently rewrites
             // "/api/takeoff/:path*" to "https://webapi.takeoffcrm.com/api/:path*".
@@ -41,15 +45,11 @@ class TakeOffClient {
         }
 
         // Normally
-        let targetUrl = `${this.baseUrl}${endpoint}`;
-        if (this.useCorsProxy) {
-            targetUrl = `https://corsproxy.io/?${targetUrl}`;
-        }
-        return targetUrl;
+        return `${this.baseUrl}${endpoint}`;
     }
 
     /**
-     * Execute a request with automatic CORS Proxy fallback on local environments
+     * Execute a request with automatic CORS Proxy fallback on all environments
      */
     async request(endpoint, options = {}) {
         const url = this.getUrl(endpoint);
@@ -58,12 +58,14 @@ class TakeOffClient {
             return response;
         } catch (error) {
             // If direct call fails due to a network error ('Failed to fetch' or similar)
-            // and we are NOT on Vercel (where rewrites should handle it), and proxy is not yet enabled:
-            const isNetworkError = error.name === 'TypeError' || 
-                                   error.message.includes('fetch') || 
-                                   error.message.includes('NetworkError');
+            // and proxy is not yet enabled, automatically fall back to the CORS proxy:
+            const errorMsg = error && error.message ? String(error.message) : '';
+            const errorName = error && error.name ? String(error.name) : '';
+            const isNetworkError = errorName === 'TypeError' || 
+                                   errorMsg.includes('fetch') || 
+                                   errorMsg.includes('NetworkError');
             
-            if (isNetworkError && !this.useCorsProxy && !window.location.hostname.endsWith('.vercel.app')) {
+            if (isNetworkError && !this.useCorsProxy) {
                 console.warn("Direct request failed. Activating public CORS proxy fallback...", error);
                 
                 this.useCorsProxy = true;
@@ -175,18 +177,39 @@ class TakeOffClient {
      * Get a Contact profile by ReferenceCode
      */
     async getContactByReferenceCode(referenceCode) {
-        const response = await this.request(`/api/contacts/referencecode/${encodeURIComponent(referenceCode)}`, {
-            method: 'GET',
-            headers: this.getHeaders()
-        });
-        if (response.status === 404) {
-            return null; // Valid business logic: contact not found
+        let contact = null;
+        try {
+            const response = await this.request(`/api/contacts?referenceCode=${encodeURIComponent(referenceCode)}`, {
+                method: 'GET',
+                headers: this.getHeaders()
+            });
+            if (response.ok) {
+                const data = await response.json();
+                if (data && Array.isArray(data.value)) {
+                    const searchLower = referenceCode.toLowerCase();
+                    contact = data.value.find(c => c && typeof c.referenceCode === 'string' && c.referenceCode.toLowerCase() === searchLower) || null;
+                }
+            }
+        } catch (error) {
+            console.warn(`Primary contact search failed, falling back to dedicated endpoint. Error: ${error.message}`);
         }
-        if (!response.ok) {
-            throw new Error(`Errore nella chiamata API per il contatto '${referenceCode}': ${response.status} ${response.statusText}`);
+
+        if (!contact) {
+            const response = await this.request(`/api/contacts/referencecode/${encodeURIComponent(referenceCode)}`, {
+                method: 'GET',
+                headers: this.getHeaders()
+            });
+            if (response.status === 404) {
+                return null; // Valid business logic: contact not found
+            }
+            if (!response.ok) {
+                throw new Error(`Errore nella chiamata API per il contatto '${referenceCode}': ${response.status} ${response.statusText}`);
+            }
+            const data = await response.json();
+            return data.value;
         }
-        const data = await response.json();
-        return data.value;
+
+        return contact;
     }
 }
 
@@ -244,28 +267,24 @@ const App = {
             document.getElementById('api-key-input').value = savedKey;
         }
 
-        // Try restoring CORS proxy preference or auto-adjust for Vercel
-        if (window.location.hostname.endsWith('.vercel.app')) {
-            const corsGroup = document.getElementById('cors-proxy-group');
-            if (corsGroup) {
-                const label = corsGroup.querySelector('.switch-label');
-                if (label) label.textContent = 'Proxy Vercel Attivo (Automatico)';
-                const switchEl = corsGroup.querySelector('.switch');
-                if (switchEl) switchEl.style.display = 'none';
-                const hint = document.getElementById('cors-proxy-hint');
-                if (hint) hint.textContent = 'In esecuzione su Vercel: proxy trasparente attivo.';
+        // Try restoring CORS proxy preference
+        const savedCorsProxy = localStorage.getItem('takeoff_cors_proxy');
+        const corsProxyInput = document.getElementById('input-cors-proxy');
+        if (corsProxyInput) {
+            if (savedCorsProxy === 'true') {
+                corsProxyInput.checked = true;
+                this.client.useCorsProxy = true;
+            } else {
+                corsProxyInput.checked = false;
+                this.client.useCorsProxy = false;
             }
-        } else {
-            const savedCorsProxy = localStorage.getItem('takeoff_cors_proxy');
-            const corsProxyInput = document.getElementById('input-cors-proxy');
-            if (corsProxyInput) {
-                if (savedCorsProxy === 'true') {
-                    corsProxyInput.checked = true;
-                    this.client.useCorsProxy = true;
-                } else {
-                    corsProxyInput.checked = false;
-                    this.client.useCorsProxy = false;
-                }
+        }
+
+        // Adjust hint on Vercel if running there
+        if (window.location.hostname.endsWith('.vercel.app')) {
+            const hint = document.getElementById('cors-proxy-hint');
+            if (hint) {
+                hint.textContent = 'In esecuzione su Vercel: usa la rewrite integrata, ma in caso di errore puoi attivare il Proxy CORS.';
             }
         }
 
