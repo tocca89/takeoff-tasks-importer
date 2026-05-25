@@ -40,7 +40,7 @@ class TakeOffClient {
             // On Vercel, the base URL is /api/takeoff, and vercel.json transparently rewrites
             // "/api/takeoff/:path*" to "https://webapi.takeoffcrm.com/api/:path*".
             // So if endpoint starts with "/api/", we strip it to avoid double "/api" in the rewrite destination.
-            const path = endpoint.startsWith('/api/') ? endpoint.substring(4) : endpoint;
+            const path = endpoint.startsWith('/api/') ? endpoint.substring(5) : endpoint;
             return `${this.baseUrl}/${path}`;
         }
 
@@ -104,7 +104,7 @@ class TakeOffClient {
             throw new Error(`Errore di connessione: ${response.status} ${response.statusText}`);
         }
         const data = await response.json();
-        return data.value; // DTO wrapper
+        return data.value !== undefined ? data.value : data; // DTO wrapper fallback
     }
 
     /**
@@ -117,7 +117,7 @@ class TakeOffClient {
         });
         if (!response.ok) throw new Error("Impossibile caricare i tipi task.");
         const data = await response.json();
-        return data.value;
+        return data.value !== undefined ? data.value : data;
     }
 
     /**
@@ -130,7 +130,7 @@ class TakeOffClient {
         });
         if (!response.ok) throw new Error(`Impossibile caricare gli stati per il tipo task #${taskTypeId}`);
         const data = await response.json();
-        return data.value;
+        return data.value !== undefined ? data.value : data;
     }
 
     /**
@@ -143,7 +143,7 @@ class TakeOffClient {
         });
         if (!response.ok) throw new Error("Impossibile caricare la lista utenti.");
         const data = await response.json();
-        return data.value;
+        return data.value !== undefined ? data.value : data;
     }
 
     /**
@@ -170,7 +170,7 @@ class TakeOffClient {
             throw new Error(errorMsg);
         }
         
-        return data.value;
+        return data.value !== undefined ? data.value : data;
     }
 
     /**
@@ -185,9 +185,10 @@ class TakeOffClient {
             });
             if (response.ok) {
                 const data = await response.json();
-                if (data && Array.isArray(data.value)) {
+                const contacts = data.value !== undefined ? data.value : data;
+                if (contacts && Array.isArray(contacts)) {
                     const searchLower = referenceCode.toLowerCase();
-                    contact = data.value.find(c => c && typeof c.referenceCode === 'string' && c.referenceCode.toLowerCase() === searchLower) || null;
+                    contact = contacts.find(c => c && typeof c.referenceCode === 'string' && c.referenceCode.toLowerCase() === searchLower) || null;
                 }
             }
         } catch (error) {
@@ -206,7 +207,7 @@ class TakeOffClient {
                 throw new Error(`Errore nella chiamata API per il contatto '${referenceCode}': ${response.status} ${response.statusText}`);
             }
             const data = await response.json();
-            return data.value;
+            return data.value !== undefined ? data.value : data;
         }
 
         return contact;
