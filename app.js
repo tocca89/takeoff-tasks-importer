@@ -8,6 +8,12 @@
 class TakeOffClient {
     constructor() {
         this.baseUrl = 'https://webapi.takeoffcrm.com';
+        this.useCorsProxy = false;
+
+        // Dynamic Environment Detection
+        if (window.location.hostname.endsWith('.vercel.app')) {
+            this.baseUrl = '/api/takeoff';
+        }
     }
 
     setApiKey(apiKey) {
@@ -23,10 +29,71 @@ class TakeOffClient {
     }
 
     /**
+     * Get clean request URL based on proxy, fallback and environment settings.
+     */
+    getUrl(endpoint) {
+        if (window.location.hostname.endsWith('.vercel.app')) {
+            // On Vercel, the base URL is /api/takeoff, and vercel.json transparently rewrites
+            // "/api/takeoff/:path*" to "https://webapi.takeoffcrm.com/api/:path*".
+            // So if endpoint starts with "/api/", we strip it to avoid double "/api" in the rewrite destination.
+            const path = endpoint.startsWith('/api/') ? endpoint.substring(4) : endpoint;
+            return `${this.baseUrl}/${path}`;
+        }
+
+        // Normally
+        let targetUrl = `${this.baseUrl}${endpoint}`;
+        if (this.useCorsProxy) {
+            targetUrl = `https://corsproxy.io/?${targetUrl}`;
+        }
+        return targetUrl;
+    }
+
+    /**
+     * Execute a request with automatic CORS Proxy fallback on local environments
+     */
+    async request(endpoint, options = {}) {
+        const url = this.getUrl(endpoint);
+        try {
+            const response = await fetch(url, options);
+            return response;
+        } catch (error) {
+            // If direct call fails due to a network error ('Failed to fetch' or similar)
+            // and we are NOT on Vercel (where rewrites should handle it), and proxy is not yet enabled:
+            const isNetworkError = error.name === 'TypeError' || 
+                                   error.message.includes('fetch') || 
+                                   error.message.includes('NetworkError');
+            
+            if (isNetworkError && !this.useCorsProxy && !window.location.hostname.endsWith('.vercel.app')) {
+                console.warn("Direct request failed. Activating public CORS proxy fallback...", error);
+                
+                this.useCorsProxy = true;
+                
+                // Keep the UI toggle check state synced
+                const checkbox = document.getElementById('input-cors-proxy');
+                if (checkbox) {
+                    checkbox.checked = true;
+                }
+                
+                // Save the preference
+                localStorage.setItem('takeoff_cors_proxy', 'true');
+                
+                if (typeof App !== 'undefined' && App.log) {
+                    App.log("Connessione diretta fallita (errore CORS). Attivazione automatica del Proxy CORS...", "warning");
+                }
+                
+                // Retry request with proxy
+                const retryUrl = this.getUrl(endpoint);
+                return await fetch(retryUrl, options);
+            }
+            throw error;
+        }
+    }
+
+    /**
      * Test connection and retrieve profile data
      */
     async getMeInfo() {
-        const response = await fetch(`${this.baseUrl}/api/me/infos`, {
+        const response = await this.request('/api/me/infos', {
             method: 'GET',
             headers: this.getHeaders()
         });
@@ -42,7 +109,7 @@ class TakeOffClient {
      * Get list of Task Types
      */
     async getTaskTypes() {
-        const response = await fetch(`${this.baseUrl}/api/tasks/types`, {
+        const response = await this.request('/api/tasks/types', {
             method: 'GET',
             headers: this.getHeaders()
         });
@@ -55,7 +122,7 @@ class TakeOffClient {
      * Get active workflow steps (statuses) for a specific Task Type
      */
     async getTaskStatuses(taskTypeId) {
-        const response = await fetch(`${this.baseUrl}/api/tasks/types/${taskTypeId}/steps`, {
+        const response = await this.request(`/api/tasks/types/${taskTypeId}/steps`, {
             method: 'GET',
             headers: this.getHeaders()
         });
@@ -68,7 +135,7 @@ class TakeOffClient {
      * Get list of active users
      */
     async getUsers() {
-        const response = await fetch(`${this.baseUrl}/api/users`, {
+        const response = await this.request('/api/users', {
             method: 'GET',
             headers: this.getHeaders()
         });
@@ -81,7 +148,7 @@ class TakeOffClient {
      * Create a single Task in TakeOff CRM
      */
     async createTask(taskDto) {
-        const response = await fetch(`${this.baseUrl}/api/tasks`, {
+        const response = await this.request('/api/tasks', {
             method: 'POST',
             headers: this.getHeaders(),
             body: JSON.stringify(taskDto)
@@ -103,6 +170,24 @@ class TakeOffClient {
         
         return data.value;
     }
+
+    /**
+     * Get a Contact profile by ReferenceCode
+     */
+    async getContactByReferenceCode(referenceCode) {
+        const response = await this.request(`/api/contacts/referencecode/${encodeURIComponent(referenceCode)}`, {
+            method: 'GET',
+            headers: this.getHeaders()
+        });
+        if (response.status === 404) {
+            return null; // Valid business logic: contact not found
+        }
+        if (!response.ok) {
+            throw new Error(`Errore nella chiamata API per il contatto '${referenceCode}': ${response.status} ${response.statusText}`);
+        }
+        const data = await response.json();
+        return data.value;
+    }
 }
 
 /**
@@ -117,12 +202,14 @@ const App = {
     taskTypes: [],
     users: [],
     currentStatuses: [],
+    contactCache: {}, // Cache for ReferenceCode resolutions
 
     // Excel Parsing State
     excelData: null, // parsed raw JSON rows
     excelHeaders: [],
     columnMapping: {
         customerCode: '',
+        referenceCode: '',
         customerName: '',
         recurrence: ''
     },
@@ -157,6 +244,31 @@ const App = {
             document.getElementById('api-key-input').value = savedKey;
         }
 
+        // Try restoring CORS proxy preference or auto-adjust for Vercel
+        if (window.location.hostname.endsWith('.vercel.app')) {
+            const corsGroup = document.getElementById('cors-proxy-group');
+            if (corsGroup) {
+                const label = corsGroup.querySelector('.switch-label');
+                if (label) label.textContent = 'Proxy Vercel Attivo (Automatico)';
+                const switchEl = corsGroup.querySelector('.switch');
+                if (switchEl) switchEl.style.display = 'none';
+                const hint = document.getElementById('cors-proxy-hint');
+                if (hint) hint.textContent = 'In esecuzione su Vercel: proxy trasparente attivo.';
+            }
+        } else {
+            const savedCorsProxy = localStorage.getItem('takeoff_cors_proxy');
+            const corsProxyInput = document.getElementById('input-cors-proxy');
+            if (corsProxyInput) {
+                if (savedCorsProxy === 'true') {
+                    corsProxyInput.checked = true;
+                    this.client.useCorsProxy = true;
+                } else {
+                    corsProxyInput.checked = false;
+                    this.client.useCorsProxy = false;
+                }
+            }
+        }
+
         this.bindEvents();
     },
 
@@ -164,6 +276,16 @@ const App = {
         // Auth events
         document.getElementById('btn-connect').addEventListener('click', () => this.connectApi());
         document.getElementById('btn-toggle-api-key').addEventListener('click', () => this.toggleApiKeyVisibility());
+
+        // CORS proxy event
+        const corsProxyInput = document.getElementById('input-cors-proxy');
+        if (corsProxyInput) {
+            corsProxyInput.addEventListener('change', (e) => {
+                this.client.useCorsProxy = e.target.checked;
+                localStorage.setItem('takeoff_cors_proxy', e.target.checked ? 'true' : 'false');
+                this.log(`Proxy CORS ${e.target.checked ? 'attivato' : 'disattivato'} manualmente.`, 'info');
+            });
+        }
         
         // Expandable text areas trigger
         document.getElementById('templates-trigger').addEventListener('click', () => {
@@ -201,6 +323,7 @@ const App = {
 
         // Mapping selectors change
         document.getElementById('map-customer-code').addEventListener('change', (e) => this.columnMapping.customerCode = e.target.value);
+        document.getElementById('map-reference-code').addEventListener('change', (e) => this.columnMapping.referenceCode = e.target.value);
         document.getElementById('map-customer-name').addEventListener('change', (e) => this.columnMapping.customerName = e.target.value);
         document.getElementById('map-recurrence').addEventListener('change', (e) => this.columnMapping.recurrence = e.target.value);
 
@@ -464,7 +587,7 @@ const App = {
     resetExcel() {
         this.excelData = null;
         this.excelHeaders = [];
-        this.columnMapping = { customerCode: '', customerName: '', recurrence: '' };
+        this.columnMapping = { customerCode: '', referenceCode: '', customerName: '', recurrence: '' };
         
         document.getElementById('excel-file-input').value = '';
         document.getElementById('excel-drop-zone').classList.remove('hidden');
@@ -479,10 +602,12 @@ const App = {
 
     populateMapper(headers) {
         const codeSel = document.getElementById('map-customer-code');
+        const refSel = document.getElementById('map-reference-code');
         const nameSel = document.getElementById('map-customer-name');
         const recSel = document.getElementById('map-recurrence');
 
         const populateOptions = (select) => {
+            if (!select) return;
             select.innerHTML = '<option value="">-- Seleziona colonna --</option>';
             headers.forEach(h => {
                 const opt = document.createElement('option');
@@ -493,6 +618,7 @@ const App = {
         };
 
         populateOptions(codeSel);
+        populateOptions(refSel);
         populateOptions(nameSel);
         populateOptions(recSel);
     },
@@ -507,6 +633,12 @@ const App = {
             if (['codicecliente', 'customercode', 'codice', 'id', 'code', 'cod'].includes(norm)) {
                 document.getElementById('map-customer-code').value = h;
                 this.columnMapping.customerCode = h;
+            }
+
+            // Map Reference Code (codiceriferimento, codiceriferimentocliente, referencecode, refcode, rif, riferimento)
+            if (['codiceriferimento', 'codiceriferimentocliente', 'referencecode', 'refcode', 'rif', 'riferimento', 'codicerif'].includes(norm)) {
+                document.getElementById('map-reference-code').value = h;
+                this.columnMapping.referenceCode = h;
             }
             
             // Map Customer Name (cliente, nome, ragionesociale, customer, name)
@@ -546,15 +678,19 @@ const App = {
     /**
      * 6. Recurrence Engine & Date Math
      */
-    generateSchedule() {
+    async generateSchedule() {
         if (!this.excelData) {
             alert("Carica prima un file Excel.");
             return;
         }
 
         const map = this.columnMapping;
-        if (!map.customerCode || !map.customerName || !map.recurrence) {
-            alert("Associa tutte e 3 le colonne obbligatorie nel pannello Mappatura prima di generare.");
+        if (!map.customerCode && !map.referenceCode) {
+            alert("Associa almeno una colonna tra 'Codice Cliente (ID)' e 'Codice Riferimento Cliente' nel pannello Mappatura prima di generare.");
+            return;
+        }
+        if (!map.customerName || !map.recurrence) {
+            alert("Associa le colonne 'Nome Cliente' e 'Codice Manutenzione' nel pannello Mappatura prima di generare.");
             return;
         }
 
@@ -570,105 +706,177 @@ const App = {
             return;
         }
 
-        this.programStartDate = startDateInput;
-        this.durationMonths = durationInput;
+        const btn = document.getElementById('btn-generate-schedule');
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Risoluzione contatti...`;
 
-        const titleTemplate = document.getElementById('template-title').value;
-        const descTemplate = document.getElementById('template-description').value;
+        try {
+            this.programStartDate = startDateInput;
+            this.durationMonths = durationInput;
 
-        const baseStartDate = new Date(startDateInput);
-        const tasks = [];
+            const titleTemplate = document.getElementById('template-title').value;
+            const descTemplate = document.getElementById('template-description').value;
 
-        this.excelData.forEach(row => {
-            const contactId = String(row[map.customerCode]).trim();
-            const clientName = String(row[map.customerName]).trim();
-            const recCode = String(row[map.recurrence]).trim().toUpperCase();
+            const baseStartDate = new Date(startDateInput);
+            const tasks = [];
 
-            if (!contactId || !clientName || !recCode) return; // skip empty rows
+            // 1. Collect unique reference codes and resolve them asynchronously, with caching
+            if (map.referenceCode) {
+                const uniqueRefCodes = [];
+                this.excelData.forEach(row => {
+                    const refCode = String(row[map.referenceCode] || '').trim();
+                    if (refCode && !uniqueRefCodes.includes(refCode)) {
+                        uniqueRefCodes.push(refCode);
+                    }
+                });
 
-            // Translate Recurrence code
-            let monthsFrequency = 0;
-            let recLabel = '';
-            switch (recCode) {
-                case 'M': monthsFrequency = 1; recLabel = 'Mensile'; break;
-                case 'B': monthsFrequency = 2; recLabel = 'Bimestrale'; break;
-                case 'T': monthsFrequency = 3; recLabel = 'Trimestrale'; break;
-                case 'S': monthsFrequency = 6; recLabel = 'Semestrale'; break;
-                case 'A': monthsFrequency = 12; recLabel = 'Annuale'; break;
-                default:
-                    this.log(`Riga ignorata: ricorrenza '${recCode}' non riconosciuta per il cliente '${clientName}'.`, 'error');
-                    return;
+                const codesToResolve = uniqueRefCodes.filter(code => !(code in this.contactCache));
+                if (codesToResolve.length > 0) {
+                    this.log(`Risoluzione di ${codesToResolve.length} nuovi Codici Riferimento in corso...`, 'info');
+                    for (let i = 0; i < codesToResolve.length; i++) {
+                        const code = codesToResolve[i];
+                        try {
+                            const contact = await this.client.getContactByReferenceCode(code);
+                            this.contactCache[code] = contact; // Stores either contact profile or null
+                            if (contact) {
+                                this.log(`Codice Riferimento '${code}' risolto con successo (ID Contatto: ${contact.id}).`, 'success');
+                            } else {
+                                this.log(`ATTENZIONE: Codice Riferimento '${code}' non trovato in TakeOff CRM.`, 'error');
+                            }
+                        } catch (err) {
+                            this.log(`Errore nella risoluzione del codice '${code}': ${err.message}`, 'error');
+                            this.contactCache[code] = null; // Prevent retrying bad requests
+                        }
+                        await this.delay(50); // slight throttling
+                    }
+                }
             }
 
-            // Loop and generate cycles within the requested total duration
-            for (let i = 0; i < this.durationMonths; i += monthsFrequency) {
-                
-                // 1. Activation Date (startValidityDate)
-                const startValidityDate = this.addMonths(baseStartDate, i);
-                
-                // 2. Planning Month (Last month of current cycle)
-                const planningMonthStart = this.addMonths(baseStartDate, i + (monthsFrequency - 1));
-                
-                // Check bounds: if activation date is beyond program duration, stop generating for this customer
-                if (i >= this.durationMonths) break;
+            // 2. Generate schedule cycles for each customer row
+            this.excelData.forEach(row => {
+                const rawContactId = map.customerCode ? String(row[map.customerCode] || '').trim() : '';
+                const referenceCode = map.referenceCode ? String(row[map.referenceCode] || '').trim() : '';
+                const clientName = String(row[map.customerName] || '').trim();
+                const recCode = String(row[map.recurrence] || '').trim().toUpperCase();
 
-                // 3. plannedStart = 1st day of the last month of cycle
-                const plannedStart = new Date(planningMonthStart.getFullYear(), planningMonthStart.getMonth(), 1);
-                
-                // 4. plannedEnd = Last day of the last month of cycle
-                const plannedEnd = new Date(planningMonthStart.getFullYear(), planningMonthStart.getMonth() + 1, 0);
+                if ((!rawContactId && !referenceCode) || !clientName || !recCode) return; // skip empty rows
 
-                // Check overall schedule boundaries (defensive check)
-                const limitDate = this.addMonths(baseStartDate, this.durationMonths);
-                if (startValidityDate >= limitDate) break;
-
-                // Format variables for templates
-                const formattedActDate = startValidityDate.toLocaleDateString('it-IT');
-                const variables = {
-                    '{cliente}': clientName,
-                    '{codice}': contactId,
-                    '{ricorrenza}': recLabel,
-                    '{data_attivazione}': formattedActDate
-                };
-
-                // Compile Title & Description
-                let title = titleTemplate;
-                let desc = descTemplate;
-                for (const [key, val] of Object.entries(variables)) {
-                    title = title.replaceAll(key, val);
-                    desc = desc.replaceAll(key, val);
+                // Translate Recurrence code
+                let monthsFrequency = 0;
+                let recLabel = '';
+                switch (recCode) {
+                    case 'M': monthsFrequency = 1; recLabel = 'Mensile'; break;
+                    case 'B': monthsFrequency = 2; recLabel = 'Bimestrale'; break;
+                    case 'T': monthsFrequency = 3; recLabel = 'Trimestrale'; break;
+                    case 'S': monthsFrequency = 6; recLabel = 'Semestrale'; break;
+                    case 'A': monthsFrequency = 12; recLabel = 'Annuale'; break;
+                    default:
+                        this.log(`Riga ignorata: ricorrenza '${recCode}' non riconosciuta per il cliente '${clientName}'.`, 'error');
+                        return;
                 }
 
-                tasks.push({
-                    index: tasks.length,
-                    contactId: parseInt(contactId),
-                    clientName: clientName,
-                    recurrence: recCode,
-                    recurrenceLabel: recLabel,
-                    startValidityDate: new Date(startValidityDate),
-                    plannedStart: plannedStart,
-                    plannedEnd: plannedEnd,
-                    title: title,
-                    description: desc,
-                    selected: true
-                });
-            }
-        });
+                // Resolve contact details
+                let contactId = null;
+                let contactResolved = null;
+                let referenceCodeUsed = null;
 
-        // Sort chronologically by activation date
-        tasks.sort((a, b) => a.startValidityDate - b.startValidityDate);
-        
-        // Re-assign indexes
-        tasks.forEach((t, i) => t.index = i);
+                if (rawContactId) {
+                    contactId = parseInt(rawContactId);
+                }
 
-        this.generatedTasks = tasks;
-        this.filteredTasks = [...tasks];
+                if (referenceCode) {
+                    referenceCodeUsed = referenceCode;
+                    const cachedContact = this.contactCache[referenceCode];
+                    if (cachedContact) {
+                        contactId = cachedContact.id;
+                        contactResolved = true;
+                    } else {
+                        contactResolved = false;
+                        if (!contactId && rawContactId) {
+                            contactId = parseInt(rawContactId);
+                        }
+                    }
+                }
 
-        this.renderPreviewTable();
-        this.updateStats();
+                // Loop and generate cycles within the requested total duration
+                for (let i = 0; i < this.durationMonths; i += monthsFrequency) {
+                    
+                    // 1. Activation Date (startValidityDate)
+                    const startValidityDate = this.addMonths(baseStartDate, i);
+                    
+                    // 2. Planning Month (Last month of current cycle)
+                    const planningMonthStart = this.addMonths(baseStartDate, i + (monthsFrequency - 1));
+                    
+                    // Check bounds
+                    if (i >= this.durationMonths) break;
 
-        document.getElementById('schedule-preview-area').classList.remove('hidden');
-        this.log(`Scadenziario generato: calcolati ${tasks.length} task complessivi.`, 'success');
+                    // 3. plannedStart = 1st day of the last month of cycle
+                    const plannedStart = new Date(planningMonthStart.getFullYear(), planningMonthStart.getMonth(), 1);
+                    
+                    // 4. plannedEnd = Last day of the last month of cycle
+                    const plannedEnd = new Date(planningMonthStart.getFullYear(), planningMonthStart.getMonth() + 1, 0);
+
+                    // Check overall schedule boundaries (defensive check)
+                    const limitDate = this.addMonths(baseStartDate, this.durationMonths);
+                    if (startValidityDate >= limitDate) break;
+
+                    // Format variables for templates
+                    const formattedActDate = startValidityDate.toLocaleDateString('it-IT');
+                    const variables = {
+                        '{cliente}': clientName,
+                        '{codice}': contactId || (referenceCode ? `REF:${referenceCode}` : 'N/D'),
+                        '{ricorrenza}': recLabel,
+                        '{data_attivazione}': formattedActDate
+                    };
+
+                    // Compile Title & Description
+                    let title = titleTemplate;
+                    let desc = descTemplate;
+                    for (const [key, val] of Object.entries(variables)) {
+                        title = title.replaceAll(key, val);
+                        desc = desc.replaceAll(key, val);
+                    }
+
+                    tasks.push({
+                        index: tasks.length,
+                        contactId: contactId,
+                        clientName: clientName,
+                        recurrence: recCode,
+                        recurrenceLabel: recLabel,
+                        startValidityDate: new Date(startValidityDate),
+                        plannedStart: plannedStart,
+                        plannedEnd: plannedEnd,
+                        title: title,
+                        description: desc,
+                        selected: contactId ? true : false, // Deselect automatically if contact is not resolved
+                        referenceCodeUsed: referenceCodeUsed,
+                        contactResolved: contactResolved
+                    });
+                }
+            });
+
+            // Sort chronologically by activation date
+            tasks.sort((a, b) => a.startValidityDate - b.startValidityDate);
+            
+            // Re-assign indexes
+            tasks.forEach((t, i) => t.index = i);
+
+            this.generatedTasks = tasks;
+            this.filteredTasks = [...tasks];
+
+            this.renderPreviewTable();
+            this.updateStats();
+
+            document.getElementById('schedule-preview-area').classList.remove('hidden');
+            this.log(`Scadenziario generato: calcolati ${tasks.length} task complessivi.`, 'success');
+        } catch (error) {
+            console.error(error);
+            alert(`Errore nella generazione dello scadenziario: ${error.message}`);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
     },
 
     addMonths(date, months) {
@@ -722,20 +930,46 @@ const App = {
         this.filteredTasks.forEach(task => {
             const tr = document.createElement('tr');
             tr.id = `task-row-${task.index}`;
+            
+            let rowClasses = [];
             if (!task.selected) {
-                tr.classList.add('row-excluded');
+                rowClasses.push('row-excluded');
+            }
+            if (task.referenceCodeUsed && task.contactResolved === false) {
+                rowClasses.push('row-warning-contact');
+            }
+            if (rowClasses.length > 0) {
+                tr.className = rowClasses.join(' ');
             }
 
             const formattedAct = this.formatDateLabel(task.startValidityDate);
             const rangeStr = `${this.formatDateLabel(task.plannedStart)} – ${this.formatDateLabel(task.plannedEnd)}`;
 
+            let clientColContent = `${task.clientName}`;
+            if (task.referenceCodeUsed) {
+                if (task.contactResolved) {
+                    clientColContent += `
+                        <span>Rif: <strong>${task.referenceCodeUsed}</strong></span>
+                        <span>ID Cliente: ${task.contactId}</span>
+                    `;
+                } else {
+                    clientColContent += `
+                        <span>Rif: <strong>${task.referenceCodeUsed}</strong></span>
+                        <span class="warning-badge"><i class="fa-solid fa-triangle-exclamation"></i> Cliente non trovato in TakeOff</span>
+                    `;
+                }
+            } else {
+                clientColContent += `<span>ID Cliente: ${task.contactId}</span>`;
+            }
+
+            const checkboxDisabled = !task.contactId ? 'disabled' : '';
+
             tr.innerHTML = `
                 <td class="col-select">
-                    <input type="checkbox" data-index="${task.index}" ${task.selected ? 'checked' : ''} class="task-select-checkbox">
+                    <input type="checkbox" data-index="${task.index}" ${task.selected ? 'checked' : ''} ${checkboxDisabled} class="task-select-checkbox">
                 </td>
                 <td class="col-client">
-                    ${task.clientName}
-                    <span>ID Cliente: ${task.contactId}</span>
+                    ${clientColContent}
                 </td>
                 <td class="col-badge">
                     <span class="freq-badge freq-${task.recurrence}">${task.recurrence}</span>
@@ -751,9 +985,11 @@ const App = {
             `;
 
             // Bind Toggle Select Individual
-            tr.querySelector('.task-select-checkbox').addEventListener('change', (e) => {
-                this.toggleTaskSelection(task.index, e.target.checked);
-            });
+            if (task.contactId) {
+                tr.querySelector('.task-select-checkbox').addEventListener('change', (e) => {
+                    this.toggleTaskSelection(task.index, e.target.checked);
+                });
+            }
 
             // Bind Edit Single task
             tr.querySelector('.btn-edit-task').addEventListener('click', () => {
@@ -778,17 +1014,27 @@ const App = {
     },
 
     toggleSelectAll(isChecked) {
-        this.generatedTasks.forEach(t => t.selected = isChecked);
-        this.filteredTasks.forEach(t => t.selected = isChecked);
+        this.generatedTasks.forEach(t => {
+            if (t.contactId) t.selected = isChecked;
+            else t.selected = false;
+        });
+        this.filteredTasks.forEach(t => {
+            if (t.contactId) t.selected = isChecked;
+            else t.selected = false;
+        });
         
-        const checkboxes = document.querySelectorAll('.task-select-checkbox');
+        const checkboxes = document.querySelectorAll('.task-select-checkbox:not([disabled])');
         checkboxes.forEach(c => c.checked = isChecked);
 
         const rows = document.querySelectorAll('#schedule-table-body tr');
         rows.forEach(r => {
             if (r.id.startsWith('task-row-')) {
-                if (isChecked) r.classList.remove('row-excluded');
-                else r.classList.add('row-excluded');
+                const index = parseInt(r.id.replace('task-row-', ''));
+                const task = this.generatedTasks[index];
+                if (task) {
+                    if (task.selected) r.classList.remove('row-excluded');
+                    else r.classList.add('row-excluded');
+                }
             }
         });
 
@@ -802,7 +1048,8 @@ const App = {
         } else {
             this.filteredTasks = this.generatedTasks.filter(t => 
                 t.clientName.toLowerCase().includes(q) || 
-                String(t.contactId).includes(q) ||
+                (t.contactId && String(t.contactId).includes(q)) ||
+                (t.referenceCodeUsed && t.referenceCodeUsed.toLowerCase().includes(q)) ||
                 t.title.toLowerCase().includes(q)
             );
         }
@@ -958,6 +1205,9 @@ const App = {
             if (!task) break;
 
             try {
+                if (!task.contactId) {
+                    throw new Error("ID Cliente non valido o mancante (ReferenceCode non risolto).");
+                }
                 // Construct standard TaskRequestDto payload
                 const payload = {
                     name: task.title,

@@ -63,6 +63,19 @@
                             </div>
                             <p class="field-hint">La chiave API verrà salvata localmente nel browser per i successivi accessi.</p>
                         </div>
+
+                        <!-- CORS Proxy Toggle -->
+                        <div class="form-group" id="cors-proxy-group" style="margin-bottom: 20px;">
+                            <div class="checkbox-wrapper">
+                                <label class="switch">
+                                    <input type="checkbox" id="input-cors-proxy">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="switch-label">Attiva Proxy CORS</span>
+                            </div>
+                            <p class="field-hint" id="cors-proxy-hint">Risolve l'errore 'Failed to fetch' in locale instradando le chiamate tramite proxy.</p>
+                        </div>
+
                         <button type="button" id="btn-connect" class="btn btn-primary btn-full">
                             <span class="btn-text">Connetti a TakeOff</span>
                             <span class="btn-icon-right"><i class="fa-solid fa-circle-check"></i></span>
@@ -191,6 +204,12 @@
                                     <span class="field-label">Codice Cliente (ID)</span>
                                     <div class="select-wrapper">
                                         <select id="map-customer-code"></select>
+                                    </div>
+                                </div>
+                                <div class="mapping-row">
+                                    <span class="field-label">Codice Riferimento Cliente</span>
+                                    <div class="select-wrapper">
+                                        <select id="map-reference-code"></select>
                                     </div>
                                 </div>
                                 <div class="mapping-row">

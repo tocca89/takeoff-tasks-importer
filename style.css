@@ -1119,3 +1119,31 @@ input:checked + .slider:before {
         max-width: 100%;
     }
 }
+
+/* Warning Badge for unresolved contacts */
+.warning-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background-color: rgba(255, 178, 54, 0.15);
+    color: hsl(40, 90%, 55%);
+    border: 1px solid hsla(40, 90%, 55%, 0.4);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 4px;
+    margin-top: 4px;
+    width: fit-content;
+}
+
+.warning-badge i {
+    font-size: 0.75rem;
+}
+
+.preview-table tr.row-warning-contact {
+    background-color: rgba(255, 178, 54, 0.03);
+}
+
+.preview-table tr.row-warning-contact:hover {
+    background-color: rgba(255, 178, 54, 0.05);
+}
