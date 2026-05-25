@@ -18,9 +18,10 @@ const TRANSLATIONS = {
         'auth.api_key_label': 'Clave API TakeOff CRM',
         'auth.api_key_placeholder': 'Introduce tu x-api-key...',
         'auth.api_key_hint': 'La clave API se guardará localmente en el navegador para accesos posteriores.',
+        'auth.api_key_toggle_title': 'Mostrar/Ocultar clave',
         'auth.cors_label': 'Activar Proxy CORS',
         'auth.cors_hint': "Resuelve el error 'Failed to fetch' en local enrutando las llamadas a través del proxy.",
-        'auth.connect_btn': 'Conectar a TapeOff',
+        'auth.connect_btn': 'Conectar a TakeOff',
         'auth.user_role_default': 'Colaborador TakeOff',
         // Defaults / config panel
         'config.title': 'Configuración de Tarea',
@@ -51,6 +52,7 @@ const TRANSLATIONS = {
         'contacts.title': 'Clientes con Mantenimiento',
         'contacts.hint': 'Carga los contactos TakeOff que tienen un tipo en el grupo <strong>MANTENIMIENTO</strong> (Mensual, Bimestral, Trimestral, Cuadrimestral, Semestral, Anual).',
         'contacts.load_btn': 'Cargar Contactos desde TakeOff',
+        'contacts.reload_title': 'Cargar de nuevo los contactos',
         'contacts.breakdown_title': 'Distribución de Recurrencias',
         'contacts.count_text': '{n} clientes con mantenimiento',
         'contacts.clients': 'clientes',
@@ -170,6 +172,7 @@ const TRANSLATIONS = {
         'auth.api_key_label': 'Chiave API TakeOff CRM',
         'auth.api_key_placeholder': 'Inserisci la tua x-api-key...',
         'auth.api_key_hint': 'La chiave API verrà salvata localmente nel browser per gli accessi successivi.',
+        'auth.api_key_toggle_title': 'Mostra/Nascondi chiave',
         'auth.cors_label': 'Attiva Proxy CORS',
         'auth.cors_hint': "Risolve l'errore 'Failed to fetch' in locale instradando le chiamate tramite il proxy.",
         'auth.connect_btn': 'Connetti a TakeOff',
@@ -203,6 +206,7 @@ const TRANSLATIONS = {
         'contacts.title': 'Clienti con Manutenzione',
         'contacts.hint': 'Carica i contatti TakeOff che hanno un tipo nel gruppo <strong>MANUTENZIONE</strong> (Mensile, Bimestrale, Trimestrale, Quadrimestrale, Semestrale, Annuale).',
         'contacts.load_btn': 'Carica Contatti da TakeOff',
+        'contacts.reload_title': 'Ricarica i contatti',
         'contacts.breakdown_title': 'Distribuzione Ricorrenze',
         'contacts.count_text': '{n} clienti con manutenzione',
         'contacts.clients': 'clienti',
@@ -278,7 +282,7 @@ const TRANSLATIONS = {
         'log.cors_toggle': 'Proxy CORS {state} manualmente.',
         'log.cors_on': 'attivato',
         'log.cors_off': 'disattivato',
-        'log.lookups_loaded': 'Dati di configurazione caricati correttamente.',
+        'log.lookups_loaded': 'Dati di configurazione configurati correttamente.',
         'log.lookups_error': 'Errore nel caricamento dati di configurazione: {msg}',
         'log.status_error': 'Errore nel caricamento stati: {msg}',
         'log.connected': 'Connessione riuscita. Benvenuto {name}!',
@@ -310,6 +314,37 @@ const TRANSLATIONS = {
         'loading.type': 'Caricamento {name}...',
         'loading.jobs_btn': 'Commesse {i}/{n}...',
     }
+};
+
+/**
+ * SafeStorage Wrapper (prevents SecurityError crashes on strict sandboxes/local file launches)
+ */
+const SafeStorage = {
+    getItem(key) {
+        try {
+            return localStorage.getItem(key);
+        } catch (e) {
+            console.warn("Storage read blocked:", e);
+            return this._fallback[key] || null;
+        }
+    },
+    setItem(key, value) {
+        try {
+            localStorage.setItem(key, value);
+        } catch (e) {
+            console.warn("Storage write blocked:", e);
+            this._fallback[key] = String(value);
+        }
+    },
+    removeItem(key) {
+        try {
+            localStorage.removeItem(key);
+        } catch (e) {
+            console.warn("Storage remove blocked:", e);
+            delete this._fallback[key];
+        }
+    },
+    _fallback: {}
 };
 
 /**
@@ -365,7 +400,7 @@ class TakeOffClient {
                 this.useCorsProxy = true;
                 const checkbox = document.getElementById('input-cors-proxy');
                 if (checkbox) checkbox.checked = true;
-                localStorage.setItem('takeoff_cors_proxy', 'true');
+                SafeStorage.setItem('takeoff_cors_proxy', 'true');
                 if (typeof App !== 'undefined' && App.log) {
                     App.log(App.t('log.cors_activated'), "warning");
                 }
@@ -620,7 +655,7 @@ const App = {
     setLang(lang) {
         if (lang !== 'es' && lang !== 'it') return;
         this.lang = lang;
-        localStorage.setItem('takeoff_lang', lang);
+        SafeStorage.setItem('takeoff_lang', lang);
         this.applyTranslations();
     },
 
@@ -692,17 +727,21 @@ const App = {
      * 4. Initialization
      */
     init() {
-        // Load saved language preference
-        const savedLang = localStorage.getItem('takeoff_lang');
-        if (savedLang === 'es' || savedLang === 'it') this.lang = savedLang;
+        // Load saved language preference or auto-detect based on browser locale
+        let savedLang = SafeStorage.getItem('takeoff_lang');
+        if (!savedLang) {
+            const browserLang = (navigator.language || navigator.userLanguage || '').substring(0, 2).toLowerCase();
+            savedLang = browserLang === 'it' ? 'it' : 'es';
+        }
+        this.lang = (savedLang === 'es' || savedLang === 'it') ? savedLang : 'es';
 
         this.programStartDate = this.formatDateIso(new Date());
         document.getElementById('input-start-date').value = this.programStartDate;
 
-        const savedKey = localStorage.getItem('takeoff_api_key');
+        const savedKey = SafeStorage.getItem('takeoff_api_key');
         if (savedKey) document.getElementById('api-key-input').value = savedKey;
 
-        const savedCorsProxy = localStorage.getItem('takeoff_cors_proxy');
+        const savedCorsProxy = SafeStorage.getItem('takeoff_cors_proxy');
         const corsProxyInput = document.getElementById('input-cors-proxy');
         if (corsProxyInput) {
             corsProxyInput.checked = savedCorsProxy === 'true';
@@ -733,7 +772,7 @@ const App = {
             this.client.setApiKey('');
             this.connectedUser = null;
             this.apiKey = '';
-            localStorage.removeItem('takeoff_api_key');
+            SafeStorage.removeItem('takeoff_api_key');
             const badge = document.getElementById('connection-badge');
             badge.className = 'badge badge-disconnected';
             badge.querySelector('.status-text').textContent = this.t('status.disconnected');
@@ -750,7 +789,7 @@ const App = {
         if (corsProxyInput) {
             corsProxyInput.addEventListener('change', (e) => {
                 this.client.useCorsProxy = e.target.checked;
-                localStorage.setItem('takeoff_cors_proxy', e.target.checked ? 'true' : 'false');
+                SafeStorage.setItem('takeoff_cors_proxy', e.target.checked ? 'true' : 'false');
                 const state = e.target.checked ? this.t('log.cors_on') : this.t('log.cors_off');
                 this.log(this.t('log.cors_toggle', { state }), 'info');
             });
@@ -882,7 +921,7 @@ const App = {
             this.client.setApiKey(keyInput);
             const userProfile = await this.client.getMeInfo();
 
-            localStorage.setItem('takeoff_api_key', keyInput);
+            SafeStorage.setItem('takeoff_api_key', keyInput);
             this.apiKey = keyInput;
             this.connectedUser = userProfile;
 
@@ -912,7 +951,7 @@ const App = {
             console.error(error);
             alert(this.t('alert.api_error', { msg: error.message }));
             this.client.setApiKey('');
-            localStorage.removeItem('takeoff_api_key');
+            SafeStorage.removeItem('takeoff_api_key');
 
             const badge = document.getElementById('connection-badge');
             badge.className = 'badge badge-disconnected';
@@ -1196,7 +1235,7 @@ const App = {
             container.innerHTML = visible.map(c => `
                 <div class="contact-list-row">
                     <label class="type-filter-label contact-list-label">
-                         <input type="checkbox" class="type-filter-cb contact-filter-cb"
+                        <input type="checkbox" class="type-filter-cb contact-filter-cb"
                             data-contact-id="${c.contactId}"
                             ${c.enabled !== false ? 'checked' : ''}>
                         <span class="contact-list-name">${this.escapeHtml(c.clientName)}</span>
