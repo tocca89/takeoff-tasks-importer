@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TakeOff CRM — Generador de Tareas Recurrentes</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Premium Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Main Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+    <!-- SheetJS (XLSX Parser) via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+    <!-- Background Animated Gradients -->
+    <div class="bg-glow bg-glow-1"></div>
+    <div class="bg-glow bg-glow-2"></div>
+
+    <div class="app-container">
+        <!-- HEADER -->
+        <header class="app-header">
+            <div class="logo-area">
+                <div class="logo-icon">
+                    <img src="logo.png" alt="TakeOff CRM" class="header-logo-img">
+                </div>
+                <div class="logo-text">
+                    <h1>TakeOff <span>Scheduler</span></h1>
+                    <p data-i18n="app.subtitle">Generador Recurrente de Tareas de Mantenimiento</p>
+                </div>
+            </div>
+            <div class="header-status-area">
+                <!-- Language toggle -->
+                <div class="lang-toggle">
+                    <button type="button" class="btn-lang active" data-lang="es">ES</button>
+                    <span class="lang-sep">|</span>
+                    <button type="button" class="btn-lang" data-lang="it">IT</button>
+                </div>
+                <div id="connection-badge" class="badge badge-disconnected">
+                    <span class="status-dot"></span>
+                    <span class="status-text" data-i18n="status.disconnected">Desconectado</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN LAYOUT -->
+        <main class="app-main-grid">
+
+            <!-- LEFT COLUMN: CONTROLS & API -->
+            <div class="grid-column left-column">
+
+                <!-- PANEL 1: AUTHENTICATION -->
+                <section class="glass-panel" id="auth-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-icon"><i class="fa-solid fa-key"></i></div>
+                        <h2 data-i18n="auth.title">Autenticación API</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <label for="api-key-input" data-i18n="auth.api_key_label">Clave API TakeOff CRM</label>
+                            <div class="input-with-action">
+                                <input type="password" id="api-key-input"
+                                    data-i18n-placeholder="auth.api_key_placeholder"
+                                    placeholder="Introduce tu x-api-key..."
+                                    autocomplete="off">
+                                <button type="button" id="btn-toggle-api-key" class="btn-icon" title="Mostrar/Ocultar clave">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                            <p class="field-hint" data-i18n="auth.api_key_hint">La clave API se guardará localmente en el navegador para accesos posteriores.</p>
+                        </div>
+
+                        <!-- CORS Proxy Toggle -->
+                        <div class="form-group" id="cors-proxy-group" style="margin-bottom: 20px;">
+                            <div class="checkbox-wrapper">
+                                <label class="switch">
+                                    <input type="checkbox" id="input-cors-proxy">
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="switch-label" data-i18n="auth.cors_label">Activar Proxy CORS</span>
+                            </div>
+                            <p class="field-hint" id="cors-proxy-hint" data-i18n="auth.cors_hint">Resuelve el error 'Failed to fetch' en local enrutando las llamadas a través del proxy.</p>
+                        </div>
+
+                        <button type="button" id="btn-connect" class="btn btn-primary btn-full">
+                            <span class="btn-text" data-i18n="auth.connect_btn">Conectar a TakeOff</span>
+                            <span class="btn-icon-right"><i class="fa-solid fa-circle-check"></i></span>
+                        </button>
+
+                        <!-- User Profile Info Card (Hidden initially) -->
+                        <div id="user-profile-card" class="user-card hidden">
+                            <div class="user-avatar" id="user-avatar">
+                                <i class="fa-solid fa-user"></i>
+                            </div>
+                            <div class="user-details">
+                                <h3 id="user-display-name">Nombre de Usuario</h3>
+                                <p id="user-role">Rol en la Empresa</p>
+                                <span class="company-badge" id="user-company">Empresa</span>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL 2: TASK DEFAULTS -->
+                <section class="glass-panel disabled" id="defaults-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-icon"><i class="fa-solid fa-sliders"></i></div>
+                        <h2 data-i18n="config.title">Configuración de Tarea</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="form-group">
+                            <label for="select-task-type" data-i18n="config.task_type_label">Tipo de Tarea <span class="required">*</span></label>
+                            <select id="select-task-type" disabled>
+                                <option value="" data-i18n="config.task_type_placeholder">Selecciona un tipo de tarea...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="select-task-status" data-i18n="config.status_label">Estado Inicial <span class="required">*</span></label>
+                            <select id="select-task-status" disabled>
+                                <option value="" data-i18n="config.status_placeholder">Selecciona un estado...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="position:relative;">
+                            <label data-i18n="config.assignee_label">Asignatario(s) por Defecto</label>
+                            <div id="assignee-picker" class="assignee-picker disabled">
+                                <div id="assignee-pills" class="assignee-pills">
+                                    <span id="assignee-placeholder" class="assignee-placeholder" data-i18n="config.assignee_none">Ninguno (Sin asignar)</span>
+                                </div>
+                                <span class="assignee-picker-chevron">&#8964;</span>
+                            </div>
+                            <div id="assignee-dropdown" class="assignee-dropdown hidden">
+                                <div class="assignee-search-wrap">
+                                    <i class="fa-solid fa-magnifying-glass" style="color:var(--text-muted);font-size:0.8rem;"></i>
+                                    <input type="text" id="assignee-search" data-i18n-placeholder="config.assignee_search" placeholder="Cerca utente o gruppo...">
+                                </div>
+                                <div id="assignee-dropdown-list" class="assignee-dropdown-list"></div>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-6">
+                                <label for="select-priority" data-i18n="config.priority_label">Prioridad</label>
+                                <select id="select-priority">
+                                    <option value="30" data-i18n="config.priority_low">Baja</option>
+                                    <option value="0" selected data-i18n="config.priority_medium">Media</option>
+                                    <option value="10" data-i18n="config.priority_high">Alta</option>
+                                    <option value="20" data-i18n="config.priority_urgent">Urgente</option>
+                                </select>
+                            </div>
+                            <div class="form-group col-6">
+                                <label for="input-important" data-i18n="config.important_label">Importante</label>
+                                <div class="checkbox-wrapper">
+                                    <label class="switch">
+                                        <input type="checkbox" id="input-important">
+                                        <span class="slider round"></span>
+                                    </label>
+                                    <span class="switch-label" data-i18n="config.important_mark">Marcar</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="expandable-trigger" id="templates-trigger">
+                            <span data-i18n="config.templates_trigger">Plantillas de Texto (Título y Descripción)</span>
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </div>
+                        <div class="expandable-content hidden" id="templates-content">
+                            <div class="form-group">
+                                <label for="template-title" data-i18n="config.template_title_label">Plantilla Título Tarea</label>
+                                <input type="text" id="template-title" value="Mantenimiento periódico - {cliente}">
+                                <p class="field-hint"><span data-i18n="config.template_title_vars">Variables disponibles:</span> <code>{cliente}</code>, <code>{codigo}</code>, <code>{recurrencia}</code>, <code>{fecha_activacion}</code></p>
+                            </div>
+                            <div class="form-group">
+                                <label for="template-description" data-i18n="config.template_desc_label">Plantilla Descripción Tarea</label>
+                                <textarea id="template-description" rows="3">Realizar el mantenimiento programado periódico del cliente {cliente}.&#10;&#10;Recurrencia programada: {recurrencia}&#10;Fecha inicio ciclo de mantenimiento: {fecha_activacion}</textarea>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <!-- RIGHT COLUMN: CONTACTS LOADER & GENERATOR PREVIEW -->
+            <div class="grid-column right-column">
+
+                <!-- PANEL 3: TAKEOFF CONTACTS LOADER -->
+                <section class="glass-panel" id="contacts-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-icon"><i class="fa-solid fa-users"></i></div>
+                        <h2 data-i18n="contacts.title">Clientes con Mantenimiento</h2>
+                    </div>
+                    <div class="panel-body">
+                        <p class="field-hint" style="margin-bottom: 16px;" data-i18n-html="contacts.hint">Carga los contactos TakeOff que tienen un tipo en el grupo <strong>MANTENIMIENTO</strong> (Mensual, Bimestral, Trimestral, Cuadrimestral, Semestral, Anual).</p>
+
+                        <button type="button" id="btn-load-contacts" class="btn btn-primary btn-full" disabled>
+                            <span class="btn-text" data-i18n="contacts.load_btn">Cargar Contactos desde TakeOff</span>
+                            <span class="btn-icon-right"><i class="fa-solid fa-cloud-arrow-down"></i></span>
+                        </button>
+
+                        <!-- Success state (hidden initially) -->
+                        <div id="contacts-success-info" class="success-info-block hidden">
+                            <div class="info-icon"><i class="fa-solid fa-circle-check"></i></div>
+                            <div class="info-details">
+                                <h4 id="contacts-count-text">0 clientes encontrados</h4>
+                                <p id="contacts-types-text"></p>
+                            </div>
+                            <button type="button" id="btn-reset-contacts" class="btn-icon btn-reset" title="Recargar contactos">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                        </div>
+
+                        <!-- Breakdown by recurrence type (hidden initially) -->
+                        <div id="contacts-breakdown" class="mapping-container hidden">
+                            <h4><i class="fa-solid fa-chart-pie"></i> <span data-i18n="contacts.breakdown_title">Distribución de Recurrencias</span></h4>
+                            <div id="contacts-breakdown-content"></div>
+                        </div>
+
+                        <!-- Individual contact selection (hidden until contacts are loaded) -->
+                        <div id="contacts-list-section" class="mapping-container hidden" style="margin-top:14px;">
+                            <div class="contact-list-header">
+                                <h4 style="margin-bottom:0;">
+                                    <i class="fa-solid fa-user-check"></i>
+                                    <span data-i18n="contacts.individual_title">Selección Individual de Contactos</span>
+                                </h4>
+                                <span id="contacts-selection-count" class="stat-badge success" style="font-size:0.75rem;"></span>
+                            </div>
+                            <div class="contact-list-toolbar">
+                                <div class="search-box" style="flex:1;min-width:0;">
+                                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                    <input type="text" id="contact-search-input"
+                                        data-i18n-placeholder="contacts.search_placeholder"
+                                        placeholder="Cerca per nome o ID...">
+                                </div>
+                                <button type="button" id="btn-contacts-select-visible" class="btn-tag btn-tag-on" data-i18n="contacts.select_visible">Sel. visibili</button>
+                                <button type="button" id="btn-contacts-deselect-visible" class="btn-tag btn-tag-off" data-i18n="contacts.deselect_visible">Desel. visibili</button>
+                            </div>
+                            <div id="contacts-list-items" class="contacts-list-scroll"></div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL 4: GENERATOR PARAMETERS & TIMELINE PREVIEW -->
+                <section class="glass-panel disabled" id="generator-panel">
+                    <div class="panel-header">
+                        <div class="panel-title-icon"><i class="fa-solid fa-calendar-days"></i></div>
+                        <h2 data-i18n="generator.title">Calendario de Mantenimientos</h2>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Date range input parameters -->
+                        <div class="generator-config">
+                            <div class="form-row">
+                                <div class="form-group col-4">
+                                    <label for="input-start-date" data-i18n="generator.start_date">Fecha de Inicio del Programa</label>
+                                    <input type="date" id="input-start-date" value="">
+                                </div>
+                                <div class="form-group col-4">
+                                    <label for="input-duration-months" data-i18n="generator.duration">Duración de la Generación</label>
+                                    <div class="input-with-unit">
+                                        <input type="number" id="input-duration-months" value="12" min="1" max="60">
+                                        <span class="input-unit" data-i18n="generator.duration_unit">Meses</span>
+                                    </div>
+                                </div>
+                                <div class="form-group col-4 justify-end">
+                                    <button type="button" id="btn-generate-schedule" class="btn btn-accent btn-full">
+                                        <span class="btn-text" data-i18n="generator.generate_btn">Generar Calendario</span>
+                                        <span class="btn-icon-right"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Main Table/Card List of calculated Tasks -->
+                        <div id="schedule-preview-area" class="schedule-preview-area hidden">
+                            <div class="preview-toolbar">
+                                <div class="search-box">
+                                    <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                    <input type="text" id="preview-search"
+                                        data-i18n-placeholder="generator.search_placeholder"
+                                        placeholder="Filtrar por cliente o código...">
+                                </div>
+                                <div class="toolbar-stats">
+                                    <span class="stat-badge"><strong id="stats-total-tasks">0</strong> <span data-i18n="generator.total_tasks">Tareas Generadas</span></span>
+                                    <span class="stat-badge success"><strong id="stats-selected-tasks">0</strong> <span data-i18n="generator.selected_tasks">Seleccionadas</span></span>
+                                </div>
+                            </div>
+
+                            <div class="table-container scrollable-y">
+                                <table class="preview-table">
+                                    <thead>
+                                        <tr>
+                                            <th class="col-select"><input type="checkbox" id="select-all-tasks" checked></th>
+                                            <th class="col-client" data-i18n="generator.col_client">Código y Cliente</th>
+                                            <th class="col-badge" data-i18n="generator.col_freq">Frec.</th>
+                                            <th class="col-date" data-i18n="generator.col_activation">Fecha de Activación</th>
+                                            <th class="col-range" data-i18n="generator.col_range">Planificación (Fin de Ciclo)</th>
+                                            <th class="col-title" data-i18n="generator.col_title">Título de la Tarea</th>
+                                            <th class="col-actions" data-i18n="generator.col_actions">Acciones</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="schedule-table-body">
+                                        <!-- Will be populated dynamically via JavaScript -->
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="action-footer">
+                                <div class="form-group" style="margin-bottom:12px;">
+                                    <label for="input-project-name" style="font-size:0.85rem;">
+                                        <i class="fa-solid fa-folder-open" style="margin-right:6px;opacity:0.7;"></i>
+                                        <span data-i18n="generator.project_name_label">Nombre del Proyecto (opcional)</span>
+                                    </label>
+                                    <input type="text" id="input-project-name"
+                                        data-i18n-placeholder="generator.project_name_placeholder"
+                                        placeholder="Ej: Mantenimiento 2026 — se creará un Proyecto en cada contacto"
+                                        style="font-size:0.9rem;">
+                                </div>
+                                <!-- Optional duplicate check toggle -->
+                                <div class="form-group check-existing-group" style="margin-bottom:12px;">
+                                    <div class="checkbox-wrapper">
+                                        <label class="switch">
+                                            <input type="checkbox" id="input-check-existing">
+                                            <span class="slider round"></span>
+                                        </label>
+                                        <span class="switch-label" data-i18n="generator.check_existing_label">Verificar tareas existentes antes de crear</span>
+                                    </div>
+                                    <p class="field-hint" style="margin-top:4px;" data-i18n="generator.check_existing_hint">Más lento pero evita duplicados si algunos contactos ya fueron procesados.</p>
+                                </div>
+                                <button type="button" id="btn-bulk-create" class="btn btn-success btn-lg">
+                                    <span class="btn-text" data-i18n="generator.create_btn">Crear en Bloque en TakeOff CRM</span>
+                                    <span class="btn-icon-right"><i class="fa-solid fa-rocket"></i></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- BULK EXECUTION MONITOR MODAL -->
+    <div class="modal-overlay hidden" id="progress-modal">
+        <div class="modal-container glass-panel">
+            <div class="modal-header">
+                <h3 data-i18n="progress.title">Creación de Tareas en Curso...</h3>
+                <span class="progress-ratio" id="progress-ratio">0 / 0</span>
+            </div>
+            <div class="modal-body">
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="progress-bar-fill" style="width: 0%;"></div>
+                </div>
+
+                <div class="stats-grid">
+                    <div class="stat-box success">
+                        <span class="stat-label" data-i18n="progress.success_label">Creadas con Éxito</span>
+                        <span class="stat-value" id="stats-success-count">0</span>
+                    </div>
+                    <div class="stat-box failure">
+                        <span class="stat-label" data-i18n="progress.failure_label">Errores / Fallidas</span>
+                        <span class="stat-value" id="stats-failure-count">0</span>
+                    </div>
+                    <div class="stat-box skipped">
+                        <span class="stat-label" data-i18n="progress.skipped_label">Saltadas / Ya existentes</span>
+                        <span class="stat-value" id="stats-skip-count">0</span>
+                    </div>
+                    <div class="stat-box speed">
+                        <span class="stat-label" data-i18n="progress.percent_label">Porcentaje</span>
+                        <span class="stat-value" id="stats-percent">0%</span>
+                    </div>
+                </div>
+
+                <div class="log-console-container">
+                    <div class="console-header">
+                        <span data-i18n="progress.log_title">Registro de operaciones API</span>
+                        <button type="button" id="btn-copy-logs" class="btn-icon-text"
+                            data-i18n-title="progress.copy_title"
+                            title="Copiar registro">
+                            <i class="fa-solid fa-copy"></i>
+                            <span data-i18n="progress.copy_btn">Copiar</span>
+                        </button>
+                    </div>
+                    <div class="console-body" id="console-logs">
+                        <!-- Dynamic logs here -->
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btn-stop-execution" class="btn btn-danger" data-i18n="progress.stop_btn">Interrumpir</button>
+                <button type="button" id="btn-close-progress" class="btn btn-secondary hidden" data-i18n="progress.close_btn">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- EDIT INDIVIDUAL TASK MODAL -->
+    <div class="modal-overlay hidden" id="edit-task-modal">
+        <div class="modal-container modal-sm glass-panel">
+            <div class="modal-header">
+                <h3 data-i18n="edit.title">Editar Vencimiento Individual</h3>
+                <button type="button" id="btn-close-edit-modal" class="btn-icon-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="edit-task-index">
+                <div class="form-group">
+                    <label for="edit-task-title" data-i18n="edit.task_title_label">Título de la Tarea</label>
+                    <input type="text" id="edit-task-title">
+                </div>
+                <div class="form-group">
+                    <label for="edit-task-activation" data-i18n="edit.activation_label">Fecha de Activación</label>
+                    <input type="datetime-local" id="edit-task-activation">
+                </div>
+                <div class="form-group">
+                    <label for="edit-task-planned-start" data-i18n="edit.planned_start_label">Inicio Planificación (plannedStart)</label>
+                    <input type="date" id="edit-task-planned-start">
+                </div>
+                <div class="form-group">
+                    <label for="edit-task-planned-end" data-i18n="edit.planned_end_label">Fin Planificación (plannedEnd)</label>
+                    <input type="date" id="edit-task-planned-end">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btn-cancel-edit" class="btn btn-secondary" data-i18n="edit.cancel">Cancelar</button>
+                <button type="button" id="btn-save-edit" class="btn btn-accent" data-i18n="edit.save">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main JS Application Logic -->
+    <script src="app.js"></script>
+</body>
+</html>

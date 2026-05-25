@@ -1,0 +1,8 @@
+{
+  "rewrites": [
+    {
+      "source": "/api/takeoff/:path*",
+      "destination": "https://webapi.takeoffcrm.com/api/:path*"
+    }
+  ]
+}
