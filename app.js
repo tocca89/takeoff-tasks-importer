@@ -1238,9 +1238,7 @@ const App = {
                     important: params.important,
                     priority: params.priority,
                     
-                    // Validity and Scheduling calculations mapped correctly to the DTO
-                    taskValidityType: 10, // 10 = ValidityDate ("Válido a partir de fecha")
-                    startValidityDate: task.startValidityDate.toISOString(), // Activation Date
+                    // Scheduling calculations mapped correctly to the DTO
                     plannedStart: task.plannedStart.toISOString(), // Beginning of last month
                     plannedEnd: task.plannedEnd.toISOString() // End of last month
                 };
