@@ -63,7 +63,8 @@ const TRANSLATIONS = {
         'contacts.list_empty': 'Ningún contacto coincide con la búsqueda.',
         // Generator panel
         'generator.title': 'Calendario de Mantenimientos',
-        'generator.start_date': 'Fecha de Inicio del Programa',
+        'generator.start_date': 'Fecha de Inicio (fallback)',
+        'generator.start_date_hint': 'Solo se usa para contactos sin la propiedad "Fecha Contrato Mantenimiento". Cada contacto arranca su ciclo en su propia fecha de contrato.',
         'generator.duration': 'Duración de la Generación',
         'generator.duration_unit': 'Meses',
         'generator.generate_btn': 'Generar Calendario',
@@ -136,6 +137,10 @@ const TRANSLATIONS = {
         'log.jobs_progress': 'Commessas {i}/{n}...',
         'log.load_complete': 'Carga completada: {n} clientes en total.',
         'log.schedule_done': 'Calendario generado: {n} tareas para {c} clientes.',
+        'log.contract_dates_summary': 'Fechas de contrato: {withDate} contactos con fecha, {fallback} sin fecha (usarán la fecha fallback).',
+        'log.contract_diag': 'Diagnóstico: no se encontró "Fecha Contrato Mantenimiento". Campos del contacto: {keys}. customProperties: {cp}',
+        'log.schedule_fallback': 'AVISO: {n} tareas generadas con la fecha fallback (contactos sin fecha de contrato).',
+        'preview.fallback_badge_title': 'Sin fecha de contrato — usando la fecha de inicio fallback',
         'log.check_existing_active': 'Verificación de duplicados activa — cada tarea se comprobará antes de crearse.',
         'log.bulk_start': 'Iniciando creación masiva de {n} tareas...',
         'log.project_creating': 'Creando proyecto "{name}" para {n} contactos...',
@@ -215,7 +220,8 @@ const TRANSLATIONS = {
         'contacts.list_empty': 'Nessun contatto corrisponde alla ricerca.',
         // Generator panel
         'generator.title': 'Calendario Manutenzioni',
-        'generator.start_date': 'Data di Inizio Programma',
+        'generator.start_date': 'Data di Inizio (fallback)',
+        'generator.start_date_hint': 'Usata solo per i contatti privi della proprietà "Fecha Contrato Mantenimiento". Ogni contatto avvia il suo ciclo dalla propria data di contratto.',
         'generator.duration': 'Durata della Generazione',
         'generator.duration_unit': 'Mesi',
         'generator.generate_btn': 'Genera Calendario',
@@ -288,6 +294,10 @@ const TRANSLATIONS = {
         'log.jobs_progress': 'Commesse {i}/{n}...',
         'log.load_complete': 'Caricamento completato: {n} clienti in totale.',
         'log.schedule_done': 'Calendario generato: {n} incarichi per {c} clienti.',
+        'log.contract_dates_summary': 'Date contratto: {withDate} contatti con data, {fallback} senza data (useranno la data fallback).',
+        'log.contract_diag': 'Diagnostica: "Fecha Contrato Mantenimiento" non trovata. Campi del contatto: {keys}. customProperties: {cp}',
+        'log.schedule_fallback': 'AVVISO: {n} incarichi generati con la data fallback (contatti senza data di contratto).',
+        'preview.fallback_badge_title': 'Nessuna data di contratto — usata la data di inizio fallback',
         'log.check_existing_active': 'Verifica duplicati attiva — ogni incarico verrà controllato prima della creazione.',
         'log.bulk_start': 'Avvio creazione massiva di {n} incarichi...',
         'log.project_creating': 'Creazione progetto "{name}" per {n} contatti...',
@@ -470,6 +480,22 @@ class TakeOffClient {
         return jobs.length > 0 ? jobs[0].id : null;
     }
 
+    async getContactById(contactId) {
+        // Full contact detail — used to read customProperties when the
+        // search endpoint returns a slim object without them.
+        try {
+            const response = await this.request(`/api/contacts/${contactId}`, {
+                method: 'GET',
+                headers: this.getHeaders()
+            });
+            if (!response.ok) return null;
+            const data = await response.json();
+            return data.value !== undefined ? data.value : data;
+        } catch (e) {
+            return null;
+        }
+    }
+
     async getContactsByTypeId(typeId, typeName, skip = 0, take = 100) {
         const response = await this.request('/api/contacts/search', {
             method: 'POST',
@@ -567,6 +593,10 @@ const App = {
 
     // Contacts State (loaded from TakeOff API)
     contactsData: [],
+
+    // Name of the contact custom property that holds the maintenance start date.
+    // Matched case-insensitively. Change here if the field is renamed in TakeOff.
+    contractDatePropName: 'Fecha Contrato Mantenimiento',
 
     // Generator & Preview State
     programStartDate: '',
@@ -1032,7 +1062,10 @@ const App = {
                                 clientName: c.companyName || c.billingCompanyName || `Cliente ${c.id}`,
                                 recurrenceCode: rec.code,
                                 recurrenceLabel: type.typologyName,  // use the actual TakeOff label
-                                enabled: true
+                                enabled: true,
+                                // Try the search payload first; may be null if the
+                                // endpoint returns a slim object (detail fetched later).
+                                contractDateRaw: this.extractCustomProperty(c, this.contractDatePropName)
                             });
                         }
                     });
@@ -1045,17 +1078,44 @@ const App = {
                 this.log(this.t('log.type_contacts', { name: type.typologyName, n: totalForType }), 'info');
             }
 
-            // Step 3: Fetch first job for each contact (required for task assignment)
+            // Step 3: Fetch first job + maintenance contract date for each contact
             const contactsArr = [...contactsMap.values()];
             this.log(this.t('log.loading_jobs', { n: contactsArr.length }), 'info');
             const btnSpan2 = btn.querySelector('span');
+            let diagDone = false;
             for (let i = 0; i < contactsArr.length; i++) {
                 const c = contactsArr[i];
                 if (btnSpan2) btnSpan2.textContent = this.t('loading.jobs_btn', { i: i + 1, n: contactsArr.length });
                 c.jobId = await this.client.getFirstJobForContact(c.contactId);
+
+                // Resolve the maintenance contract date. If the search payload
+                // didn't carry it, fetch the full contact detail and read it there.
+                if (c.contractDateRaw == null) {
+                    const detail = await this.client.getContactById(c.contactId);
+                    if (detail) {
+                        c.contractDateRaw = this.extractCustomProperty(detail, this.contractDatePropName);
+                        // One-time diagnostic: if even the detail lacks the field,
+                        // surface the available keys so the shape can be verified.
+                        if (!diagDone && c.contractDateRaw == null) {
+                            diagDone = true;
+                            const cp = detail.customProperties || detail.customFields || detail.properties;
+                            this.log(this.t('log.contract_diag', {
+                                keys: Object.keys(detail).join(', '),
+                                cp: cp ? JSON.stringify(cp).slice(0, 400) : 'none'
+                            }), 'warning');
+                        }
+                    }
+                }
+                c.contractStartDate = this.parseContractDate(c.contractDateRaw);
                 await this.delay(50);
             }
             this.contactsData = contactsArr;
+
+            // Summarise how many contacts carry a usable contract date.
+            const withDate     = this.contactsData.filter(c => c.contractStartDate).length;
+            const withoutDate  = this.contactsData.length - withDate;
+            this.log(this.t('log.contract_dates_summary', { withDate, fallback: withoutDate }),
+                     withoutDate > 0 ? 'warning' : 'success');
 
             if (this.contactsData.length === 0) {
                 const typeNames = matchedTypes.map(t => t.typologyName).join(', ');
@@ -1205,6 +1265,85 @@ const App = {
         }
     },
 
+    /* ── Custom-property extraction (maintenance contract date) ─────────── */
+
+    // Pulls a named custom property out of a contact object, tolerant of the
+    // many shapes a CRM might return (array of {name,value}, dict keyed by
+    // name, alternate key names). Returns the raw value or null.
+    extractCustomProperty(contact, propName) {
+        if (!contact || !propName) return null;
+        const target = propName.trim().toLowerCase();
+        const nameKeys  = ['name', 'label', 'key', 'propertyName', 'fieldName', 'title', 'displayName', 'code'];
+        const valueKeys = ['value', 'stringValue', 'dateValue', 'val', 'text', 'data', 'content'];
+
+        const pickValue = (o) => {
+            for (const vk of valueKeys) {
+                if (o[vk] !== undefined && o[vk] !== null && o[vk] !== '') return o[vk];
+            }
+            return null;
+        };
+
+        const containers = [
+            contact.customProperties, contact.customFields, contact.properties,
+            contact.customPropertyValues, contact.customValues, contact.fields
+        ];
+
+        for (const cont of containers) {
+            if (!cont) continue;
+            if (Array.isArray(cont)) {
+                for (const item of cont) {
+                    if (!item || typeof item !== 'object') continue;
+                    for (const nk of nameKeys) {
+                        if (typeof item[nk] === 'string' && item[nk].trim().toLowerCase() === target) {
+                            const v = pickValue(item);
+                            if (v != null) return v;
+                        }
+                    }
+                }
+            } else if (typeof cont === 'object') {
+                for (const k of Object.keys(cont)) {
+                    if (k.trim().toLowerCase() !== target) continue;
+                    const v = cont[k];
+                    if (v && typeof v === 'object') {
+                        const pv = pickValue(v);
+                        if (pv != null) return pv;
+                    } else if (v != null && v !== '') {
+                        return v;
+                    }
+                }
+            }
+        }
+        return null;
+    },
+
+    // Parses a contract date that may arrive as ISO, dd/mm/yyyy or dd-mm-yyyy.
+    // Returns a Date or null.
+    parseContractDate(raw) {
+        if (raw == null || raw === '') return null;
+        if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
+        const s = String(raw).trim();
+        if (!s) return null;
+
+        // ISO-like (yyyy-mm-dd, optionally with time) — unambiguous, trust it.
+        if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+            const d = new Date(s);
+            if (!isNaN(d.getTime())) return d;
+        }
+
+        // European dd/mm/yyyy or dd-mm-yyyy or dd.mm.yyyy
+        const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+        if (m) {
+            let dd = +m[1], mm = +m[2], yy = +m[3];
+            if (yy < 100) yy += 2000;
+            const d = new Date(yy, mm - 1, dd);
+            if (!isNaN(d.getTime())) return d;
+        }
+
+        // Last resort: let the engine try.
+        const d = new Date(s);
+        return isNaN(d.getTime()) ? null : d;
+    },
+
     /* ── Assignee Pill-Picker ──────────────────────────────────────────── */
 
     renderAssigneePicker() {
@@ -1350,10 +1489,10 @@ const App = {
 
             const titleTemplate = document.getElementById('template-title').value;
             const descTemplate  = document.getElementById('template-description').value;
-            const baseStartDate = new Date(startDateInput);
-            const limitDate     = this.addMonths(baseStartDate, this.durationMonths);
+            const fallbackStart = new Date(startDateInput);
             const tasks         = [];
             const localeLang    = this.lang === 'it' ? 'it-IT' : 'es-ES';
+            let fallbackCount   = 0;
 
             this.contactsData.forEach(contact => {
                 // Skip types that have been unchecked in the breakdown filter
@@ -1371,6 +1510,13 @@ const App = {
                     case 'A': monthsFrequency = 12; break;
                     default: return;
                 }
+
+                // Each contact starts its cycle on its own "Fecha Contrato
+                // Mantenimiento"; fall back to the program date if missing.
+                const usedFallback  = !contact.contractStartDate;
+                if (usedFallback) fallbackCount++;
+                const baseStartDate = contact.contractStartDate || fallbackStart;
+                const limitDate     = this.addMonths(baseStartDate, this.durationMonths);
 
                 // Use the UI language for the recurrence label in templates
                 const recLabel = this.t('rec.' + recurrenceCode);
@@ -1409,10 +1555,15 @@ const App = {
                         plannedEnd,
                         title,
                         description: desc,
+                        usedFallbackDate: usedFallback,
                         selected: true
                     });
                 }
             });
+
+            if (fallbackCount > 0) {
+                this.log(this.t('log.schedule_fallback', { n: fallbackCount }), 'warning');
+            }
 
             tasks.sort((a, b) => a.startValidityDate - b.startValidityDate);
             tasks.forEach((t, i) => t.index = i);
@@ -1501,7 +1652,7 @@ const App = {
                 <td class="col-badge">
                     <span class="freq-badge freq-${task.recurrence}">${task.recurrence}</span>
                 </td>
-                <td class="col-date">${this.formatDateLabel(task.startValidityDate)}</td>
+                <td class="col-date">${this.formatDateLabel(task.startValidityDate)}${task.usedFallbackDate ? ` <span class="fallback-badge" title="${this.t('preview.fallback_badge_title')}"><i class="fa-solid fa-triangle-exclamation"></i></span>` : ''}</td>
                 <td class="col-range">${this.formatDateLabel(task.plannedStart)} – ${this.formatDateLabel(task.plannedEnd)}</td>
                 <td class="col-title">${task.title}</td>
                 <td class="col-actions">

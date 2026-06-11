@@ -1332,6 +1332,17 @@ input:checked + .slider:before {
     width: 28px;
 }
 
+/* Marks an activation date that fell back to the program date because the
+   contact had no "Fecha Contrato Mantenimiento". */
+.fallback-badge {
+    display: inline-flex;
+    margin-left: 5px;
+    color: var(--warning);
+    font-size: 0.72rem;
+    cursor: help;
+    vertical-align: middle;
+}
+
 .freq-M { background-color: var(--primary-glow); color: hsl(250, 95%, 75%); border: 1px solid var(--primary); }
 .freq-B { background-color: hsla(280, 80%, 50%, 0.2); color: hsl(280, 90%, 75%); border: 1px solid hsl(280, 80%, 50%); }
 .freq-T { background-color: var(--accent-glow); color: var(--accent); border: 1px solid var(--accent); }
