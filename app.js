@@ -2033,6 +2033,12 @@ const App = {
                     ? this.formatDateTimeIsoLocal(task.startValidityDate)
                     : null;
 
+                // Se la data di attivazione è futura, impostiamo lo stato a 0 (Pending) in modo che 
+                // il CRM la mantenga in attesa e la attivi solo alla data startValidityDate.
+                // Altrimenti, se è già passata o oggi, la creiamo come 1 (Accepted - attiva).
+                const now = new Date();
+                const taskState = (task.startValidityDate instanceof Date && task.startValidityDate > now) ? 0 : 1;
+
                 // Optional duplicate check
                 if (params.checkExisting) {
                     const exists = await this.client.taskExistsInPeriod(
@@ -2064,7 +2070,11 @@ const App = {
                     ...(params.assignedEntityIds.length > 0 && { assignedEntityIds: params.assignedEntityIds }),
                     // Task activation: "Válido a partir de fecha" (taskValidityType 10),
                     // activated from the first day of the maintenance cycle.
-                    ...(startValidityIso && { taskValidityType: 10, startValidityDate: startValidityIso }),
+                    ...(startValidityIso && { 
+                        taskValidityType: 10, 
+                        startValidityDate: startValidityIso,
+                        state: taskState
+                    }),
                 };
 
                 await this.client.createTask(payload);
