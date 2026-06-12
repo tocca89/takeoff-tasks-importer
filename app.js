@@ -67,6 +67,9 @@ const TRANSLATIONS = {
         'generator.start_date_hint': 'Solo se usa para contactos sin la propiedad "Fecha Contrato Mantenimiento". Cada contacto arranca su ciclo en su propia fecha de contrato.',
         'generator.duration': 'Duración de la Generación',
         'generator.duration_unit': 'Meses',
+        'generator.offset_days': 'Días de antelación (Activación)',
+        'generator.offset_unit': 'Días',
+        'generator.offset_hint': 'Si se deja vacío o en 0, se activa al inicio del periodo.',
         'generator.generate_btn': 'Generar Calendario',
         'generator.search_placeholder': 'Filtrar por cliente o código...',
         'generator.total_tasks': 'Tareas Generadas',
@@ -226,6 +229,9 @@ const TRANSLATIONS = {
         'generator.start_date_hint': 'Usata solo per i contatti privi della proprietà "Data inizio manutenzione" (o "Fecha Contrato Mantenimiento"). Ogni contatto avvia il suo ciclo dalla propria data di contratto.',
         'generator.duration': 'Durata della Generazione',
         'generator.duration_unit': 'Mesi',
+        'generator.offset_days': 'Giorni di anticipo (Attivazione)',
+        'generator.offset_unit': 'Giorni',
+        'generator.offset_hint': 'Se lasciato vuoto o a 0, si attiva all\'inizio del periodo.',
         'generator.generate_btn': 'Genera Calendario',
         'generator.search_placeholder': 'Filtra per cliente o codice...',
         'generator.total_tasks': 'Incarichi Generati',
@@ -1562,6 +1568,8 @@ const App = {
             return;
         }
 
+        const offsetDaysInput = parseInt(document.getElementById('input-activation-offset').value) || 0;
+
         const btn = document.getElementById('btn-generate-schedule');
         const originalHtml = btn.innerHTML;
         btn.disabled = true;
@@ -1613,23 +1621,28 @@ const App = {
                 // Walk the cadence anchored on the contract date, skipping past
                 // cycles and stopping at the end of the from-today window.
                 for (let i = 0; ; i += monthsFrequency) {
-                    const startValidityDate = this.addMonths(baseStartDate, i);
-                    if (startValidityDate >= windowEnd) break;   // past the window
+                    const cycleStartDate = this.addMonths(baseStartDate, i);
+                    if (cycleStartDate >= windowEnd) break;   // past the window
                     if (i > 12 * 300) break;                      // safety net
-                    if (startValidityDate < today) continue;      // never recreate past cycles
+                    if (cycleStartDate < today) continue;      // never recreate past cycles
 
                     // Planning period = the full maintenance cycle: from the
                     // activation date to the day before the next cycle starts.
                     // e.g. monthly from 11/06 -> 11/06–10/07, quarterly -> 11/06–10/09.
                     const nextCycleStart = this.addMonths(baseStartDate, i + monthsFrequency);
-                    const plannedStart   = new Date(startValidityDate);
+                    const plannedStart   = new Date(cycleStartDate);
                     const plannedEnd     = new Date(nextCycleStart.getFullYear(), nextCycleStart.getMonth(), nextCycleStart.getDate() - 1);
+
+                    const actualActivationDate = new Date(cycleStartDate);
+                    if (offsetDaysInput > 0) {
+                        actualActivationDate.setDate(actualActivationDate.getDate() - offsetDaysInput);
+                    }
 
                     const variables = {
                         '{cliente}':          clientName,
                         '{codigo}':           contactId,
                         '{recurrencia}':      recLabel,
-                        '{fecha_activacion}': startValidityDate.toLocaleDateString(localeLang)
+                        '{fecha_activacion}': actualActivationDate.toLocaleDateString(localeLang)
                     };
 
                     let title = titleTemplate;
@@ -1646,7 +1659,7 @@ const App = {
                         jobId,
                         recurrence: recurrenceCode,
                         recurrenceLabel: recLabel,
-                        startValidityDate: new Date(startValidityDate),
+                        startValidityDate: new Date(actualActivationDate),
                         plannedStart,
                         plannedEnd,
                         title,

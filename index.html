@@ -260,7 +260,17 @@
                                         <span class="input-unit" data-i18n="generator.duration_unit">Meses</span>
                                     </div>
                                 </div>
-                                <div class="form-group col-4 justify-end">
+                                <div class="form-group col-4">
+                                    <label for="input-activation-offset" data-i18n="generator.offset_days">Días de antelación (Activación)</label>
+                                    <div class="input-with-unit">
+                                        <input type="number" id="input-activation-offset" value="" min="0" max="365" placeholder="0">
+                                        <span class="input-unit" data-i18n="generator.offset_unit">Días</span>
+                                    </div>
+                                    <p class="field-hint" data-i18n="generator.offset_hint" style="margin-top:5px;">Si se deja vacío o en 0, se activa al inicio del periodo.</p>
+                                </div>
+                            </div>
+                            <div class="form-row" style="margin-top: 16px;">
+                                <div class="form-group" style="width: 100%;">
                                     <button type="button" id="btn-generate-schedule" class="btn btn-accent btn-full">
                                         <span class="btn-text" data-i18n="generator.generate_btn">Generar Calendario</span>
                                         <span class="btn-icon-right"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
