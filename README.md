@@ -10,7 +10,7 @@ Interfaccia **bilingue IT / ES** con tema corporate **nero + giallo `#ffd903` + 
 
 1. **Autenticazione API** — chiave `x-api-key` validata in tempo reale (`/api/me/infos`), salvata nel `localStorage`. Proxy CORS opzionale per l'uso in locale.
 2. **Caricamento contatti dal CRM** — carica i contatti che hanno un tipo nel gruppo **MANUTENZIONE** (Mensile, Bimestrale, Trimestrale, Quadrimestrale, Semestrale, Annuale, sia in IT che ES).
-3. **Data di inizio dal contatto** — il ciclo di ogni contatto parte dalla custom property **`Fecha Contrato Mantenimiento`** (letta dal dettaglio contatto). In assenza, si usa la data di fallback impostata a mano.
+3. **Data di inizio dal contatto** — il ciclo di ogni contatto parte dalla custom property **`Data inizio manutenzione`** (o **`Fecha Contrato Mantenimiento`**), letta dal dettaglio contatto. In assenza, si usa la data di fallback impostata a mano.
 4. **Selezione granulare** — filtro per tipo di ricorrenza (per rigenerare solo i tipi nuovi) e selezione individuale dei contatti con ricerca e check multiplo.
 5. **Assegnazione multipla** — ogni incarico può essere assegnato a **un utente, più utenti, un gruppo o qualsiasi combinazione** (campo `assignedEntityIds`, formato `us_<id>` / `gr_<id>`).
 6. **Anteprima dello scadenziario** — tabella interattiva filtrabile, con abilita/disabilita per riga e modifica rapida di date e titolo prima dell'invio.

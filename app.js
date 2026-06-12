@@ -221,7 +221,7 @@ const TRANSLATIONS = {
         // Generator panel
         'generator.title': 'Calendario Manutenzioni',
         'generator.start_date': 'Data di Inizio (fallback)',
-        'generator.start_date_hint': 'Usata solo per i contatti privi della proprietà "Fecha Contrato Mantenimiento". Ogni contatto avvia il suo ciclo dalla propria data di contratto.',
+        'generator.start_date_hint': 'Usata solo per i contatti privi della proprietà "Data inizio manutenzione" (o "Fecha Contrato Mantenimiento"). Ogni contatto avvia il suo ciclo dalla propria data di contratto.',
         'generator.duration': 'Durata della Generazione',
         'generator.duration_unit': 'Mesi',
         'generator.generate_btn': 'Genera Calendario',
@@ -295,7 +295,7 @@ const TRANSLATIONS = {
         'log.load_complete': 'Caricamento completato: {n} clienti in totale.',
         'log.schedule_done': 'Calendario generato: {n} incarichi per {c} clienti.',
         'log.contract_dates_summary': 'Date contratto: {withDate} contatti con data, {fallback} senza data (useranno la data fallback).',
-        'log.contract_diag': 'Diagnostica: "Fecha Contrato Mantenimiento" non trovata. Campi del contatto: {keys}. customProperties: {cp}',
+        'log.contract_diag': 'Diagnostica: data inizio manutenzione non trovata. Campi del contatto: {keys}. customProperties: {cp}',
         'log.schedule_fallback': 'AVVISO: {n} incarichi generati con la data fallback (contatti senza data di contratto).',
         'preview.fallback_badge_title': 'Nessuna data di contratto — usata la data di inizio fallback',
         'log.check_existing_active': 'Verifica duplicati attiva — ogni incarico verrà controllato prima della creazione.',
@@ -653,9 +653,10 @@ const App = {
     // Contacts State (loaded from TakeOff API)
     contactsData: [],
 
-    // Name of the contact custom property that holds the maintenance start date.
-    // Matched case-insensitively. Change here if the field is renamed in TakeOff.
-    contractDatePropName: 'Fecha Contrato Mantenimiento',
+    // Names of the contact custom property that holds the maintenance start
+    // date. Matched case-insensitively; the first one found on the contact
+    // wins. Add aliases here if the field is named differently in TakeOff.
+    contractDatePropNames: ['Fecha Contrato Mantenimiento', 'Data inizio manutenzione'],
 
     // Generator & Preview State
     programStartDate: '',
@@ -1136,7 +1137,7 @@ const App = {
                                 enabled: true,
                                 // Try the search payload first; may be null if the
                                 // endpoint returns a slim object (detail fetched later).
-                                contractDateRaw: this.extractCustomProperty(c, this.contractDatePropName)
+                                contractDateRaw: this.extractCustomProperty(c, this.contractDatePropNames)
                             });
                         }
                     });
@@ -1164,7 +1165,7 @@ const App = {
                 if (c.contractDateRaw == null) {
                     const detail = await this.client.getContactById(c.contactId);
                     if (detail) {
-                        c.contractDateRaw = this.extractCustomProperty(detail, this.contractDatePropName);
+                        c.contractDateRaw = this.extractCustomProperty(detail, this.contractDatePropNames);
                         // One-time diagnostic: if even the detail lacks the field,
                         // surface the available keys so the shape can be verified.
                         if (!diagDone && c.contractDateRaw == null) {
@@ -1343,7 +1344,13 @@ const App = {
     // name, alternate key names). Returns the raw value or null.
     extractCustomProperty(contact, propName) {
         if (!contact || !propName) return null;
-        const target = propName.trim().toLowerCase();
+        // propName may be a single name or a list of accepted aliases.
+        const targets = new Set(
+            (Array.isArray(propName) ? propName : [propName])
+                .filter(Boolean)
+                .map(n => String(n).trim().toLowerCase())
+        );
+        if (targets.size === 0) return null;
         const nameKeys  = ['name', 'label', 'key', 'propertyName', 'fieldName', 'title', 'displayName', 'code'];
         const valueKeys = ['value', 'stringValue', 'dateValue', 'val', 'text', 'data', 'content'];
 
@@ -1365,7 +1372,7 @@ const App = {
                 for (const item of cont) {
                     if (!item || typeof item !== 'object') continue;
                     for (const nk of nameKeys) {
-                        if (typeof item[nk] === 'string' && item[nk].trim().toLowerCase() === target) {
+                        if (typeof item[nk] === 'string' && targets.has(item[nk].trim().toLowerCase())) {
                             const v = pickValue(item);
                             if (v != null) return v;
                         }
@@ -1373,7 +1380,7 @@ const App = {
                 }
             } else if (typeof cont === 'object') {
                 for (const k of Object.keys(cont)) {
-                    if (k.trim().toLowerCase() !== target) continue;
+                    if (!targets.has(k.trim().toLowerCase())) continue;
                     const v = cont[k];
                     if (v && typeof v === 'object') {
                         const pv = pickValue(v);
