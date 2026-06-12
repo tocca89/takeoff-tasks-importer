@@ -69,7 +69,7 @@ const TRANSLATIONS = {
         'generator.duration_unit': 'Meses',
         'generator.offset_days': 'Días de antelación (Activación)',
         'generator.offset_unit': 'Días',
-        'generator.offset_hint': 'Si se deja vacío o en 0, se activa al inicio del periodo.',
+        'generator.offset_hint': 'Si se deja vacío o en 0, se activa al inicio del periodo. De lo contrario, se resta del final del periodo.',
         'generator.generate_btn': 'Generar Calendario',
         'generator.search_placeholder': 'Filtrar por cliente o código...',
         'generator.total_tasks': 'Tareas Generadas',
@@ -231,7 +231,7 @@ const TRANSLATIONS = {
         'generator.duration_unit': 'Mesi',
         'generator.offset_days': 'Giorni di anticipo (Attivazione)',
         'generator.offset_unit': 'Giorni',
-        'generator.offset_hint': 'Se lasciato vuoto o a 0, si attiva all\'inizio del periodo.',
+        'generator.offset_hint': 'Se lasciato vuoto o a 0, si attiva all\'inizio del periodo. Altrimenti, i giorni vengono sottratti dalla fine del periodo.',
         'generator.generate_btn': 'Genera Calendario',
         'generator.search_placeholder': 'Filtra per cliente o codice...',
         'generator.total_tasks': 'Incarichi Generati',
@@ -1633,7 +1633,7 @@ const App = {
                     const plannedStart   = new Date(cycleStartDate);
                     const plannedEnd     = new Date(nextCycleStart.getFullYear(), nextCycleStart.getMonth(), nextCycleStart.getDate() - 1);
 
-                    const actualActivationDate = new Date(cycleStartDate);
+                    const actualActivationDate = new Date(offsetDaysInput > 0 ? plannedEnd : cycleStartDate);
                     if (offsetDaysInput > 0) {
                         actualActivationDate.setDate(actualActivationDate.getDate() - offsetDaysInput);
                     }
