@@ -323,6 +323,31 @@ const TRANSLATIONS = {
 };
 
 /**
+ * 0b. Resilient storage — localStorage that degrades to an in-memory store
+ * instead of throwing when it's unavailable (Safari private mode, quota,
+ * disabled cookies). Used for the API key, language and CORS-proxy flag.
+ */
+const safeStorage = (function () {
+    const mem = {};
+    let backing = null;
+    try { backing = window.localStorage; } catch (e) { backing = null; }
+    return {
+        getItem(k) {
+            try { return backing ? backing.getItem(k) : (k in mem ? mem[k] : null); }
+            catch (e) { return (k in mem ? mem[k] : null); }
+        },
+        setItem(k, v) {
+            try { if (backing) backing.setItem(k, v); else mem[k] = String(v); }
+            catch (e) { mem[k] = String(v); }
+        },
+        removeItem(k) {
+            try { if (backing) backing.removeItem(k); else delete mem[k]; }
+            catch (e) { delete mem[k]; }
+        }
+    };
+})();
+
+/**
  * 1. TakeOff REST API Service Client
  */
 class TakeOffClient {
@@ -375,7 +400,7 @@ class TakeOffClient {
                 this.useCorsProxy = true;
                 const checkbox = document.getElementById('input-cors-proxy');
                 if (checkbox) checkbox.checked = true;
-                localStorage.setItem('takeoff_cors_proxy', 'true');
+                safeStorage.setItem('takeoff_cors_proxy', 'true');
                 if (typeof App !== 'undefined' && App.log) {
                     App.log(App.t('log.cors_activated'), "warning");
                 }
@@ -660,10 +685,22 @@ const App = {
         );
     },
 
+    // Escapes CRM/user-supplied strings before they are interpolated into
+    // innerHTML, preventing stored-XSS via contact names, group names, titles…
+    escapeHtml(value) {
+        if (value == null) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
+    },
+
     setLang(lang) {
         if (lang !== 'es' && lang !== 'it') return;
         this.lang = lang;
-        localStorage.setItem('takeoff_lang', lang);
+        safeStorage.setItem('takeoff_lang', lang);
         this.applyTranslations();
     },
 
@@ -736,16 +773,16 @@ const App = {
      */
     init() {
         // Load saved language preference
-        const savedLang = localStorage.getItem('takeoff_lang');
+        const savedLang = safeStorage.getItem('takeoff_lang');
         if (savedLang === 'es' || savedLang === 'it') this.lang = savedLang;
 
         this.programStartDate = this.formatDateIso(new Date());
         document.getElementById('input-start-date').value = this.programStartDate;
 
-        const savedKey = localStorage.getItem('takeoff_api_key');
+        const savedKey = safeStorage.getItem('takeoff_api_key');
         if (savedKey) document.getElementById('api-key-input').value = savedKey;
 
-        const savedCorsProxy = localStorage.getItem('takeoff_cors_proxy');
+        const savedCorsProxy = safeStorage.getItem('takeoff_cors_proxy');
         const corsProxyInput = document.getElementById('input-cors-proxy');
         if (corsProxyInput) {
             corsProxyInput.checked = savedCorsProxy === 'true';
@@ -776,7 +813,7 @@ const App = {
             this.client.setApiKey('');
             this.connectedUser = null;
             this.apiKey = '';
-            localStorage.removeItem('takeoff_api_key');
+            safeStorage.removeItem('takeoff_api_key');
             const badge = document.getElementById('connection-badge');
             badge.className = 'badge badge-disconnected';
             badge.querySelector('.status-text').textContent = this.t('status.disconnected');
@@ -793,7 +830,7 @@ const App = {
         if (corsProxyInput) {
             corsProxyInput.addEventListener('change', (e) => {
                 this.client.useCorsProxy = e.target.checked;
-                localStorage.setItem('takeoff_cors_proxy', e.target.checked ? 'true' : 'false');
+                safeStorage.setItem('takeoff_cors_proxy', e.target.checked ? 'true' : 'false');
                 const state = e.target.checked ? this.t('log.cors_on') : this.t('log.cors_off');
                 this.log(this.t('log.cors_toggle', { state }), 'info');
             });
@@ -902,7 +939,7 @@ const App = {
             this.client.setApiKey(keyInput);
             const userProfile = await this.client.getMeInfo();
 
-            localStorage.setItem('takeoff_api_key', keyInput);
+            safeStorage.setItem('takeoff_api_key', keyInput);
             this.apiKey = keyInput;
             this.connectedUser = userProfile;
 
@@ -917,9 +954,9 @@ const App = {
             document.getElementById('user-company').textContent = `ID: ${userProfile.inDittaCompanyId}`;
 
             if (userProfile.profileImage) {
-                document.getElementById('user-avatar').innerHTML = `<img src="${userProfile.profileImage}" alt="avatar">`;
+                document.getElementById('user-avatar').innerHTML = `<img src="${this.escapeHtml(userProfile.profileImage)}" alt="avatar">`;
             } else {
-                document.getElementById('user-avatar').innerHTML = `<span style="font-weight:bold">${userProfile.initials || 'U'}</span>`;
+                document.getElementById('user-avatar').innerHTML = `<span style="font-weight:bold">${this.escapeHtml(userProfile.initials || 'U')}</span>`;
             }
 
             await this.loadLookups();
@@ -932,7 +969,7 @@ const App = {
             console.error(error);
             alert(this.t('alert.api_error', { msg: error.message }));
             this.client.setApiKey('');
-            localStorage.removeItem('takeoff_api_key');
+            safeStorage.removeItem('takeoff_api_key');
 
             const badge = document.getElementById('connection-badge');
             badge.className = 'badge badge-disconnected';
@@ -1173,8 +1210,8 @@ const App = {
                     .map(([label, count]) => `
                         <div class="mapping-row type-filter-row">
                             <label class="type-filter-label">
-                                <input type="checkbox" class="type-filter-cb" data-label="${label}" checked>
-                                <span class="field-label">${label}</span>
+                                <input type="checkbox" class="type-filter-cb" data-label="${this.escapeHtml(label)}" checked>
+                                <span class="field-label">${this.escapeHtml(label)}</span>
                             </label>
                             <span class="stat-badge"><strong>${count}</strong> ${this.t('contacts.clients')}</span>
                         </div>
@@ -1251,8 +1288,8 @@ const App = {
                         <input type="checkbox" class="type-filter-cb contact-filter-cb"
                             data-contact-id="${c.contactId}"
                             ${c.enabled !== false ? 'checked' : ''}>
-                        <span class="contact-list-name">${c.clientName}</span>
-                        <span style="font-size:0.7rem;color:var(--text-muted);margin-left:4px;">ID: ${c.contactId}</span>
+                        <span class="contact-list-name">${this.escapeHtml(c.clientName)}</span>
+                        <span style="font-size:0.7rem;color:var(--text-muted);margin-left:4px;">ID: ${this.escapeHtml(c.contactId)}</span>
                     </label>
                     <span class="freq-badge freq-${c.recurrenceCode}" style="font-size:0.68rem;padding:2px 7px;flex-shrink:0;">${c.recurrenceCode}</span>
                 </div>
@@ -1398,7 +1435,7 @@ const App = {
                 pill.dataset.id   = a.id;
                 pill.dataset.type = a.type;
                 const icon = a.type === 'group' ? '👥' : '👤';
-                pill.innerHTML = `${icon} ${a.name} <button type="button" class="pill-remove" title="Rimuovi">×</button>`;
+                pill.innerHTML = `${icon} ${this.escapeHtml(a.name)} <button type="button" class="pill-remove" title="Rimuovi">×</button>`;
                 pill.querySelector('.pill-remove').addEventListener('click', (e) => {
                     e.stopPropagation();
                     this.toggleAssigneeItem(a.id, a.type, a.name);
@@ -1433,10 +1470,11 @@ const App = {
             html += `<div class="assignee-section-header">${this.t('config.assignee_users_section')}</div>`;
             users.forEach(u => {
                 const name = u.displayName || `${u.firstName || ''} ${u.lastName || ''}`.trim();
+                const safeName = this.escapeHtml(name);
                 const isSelected = this.selectedAssignees.some(a => a.type === 'user' && a.id === u.id);
-                html += `<div class="assignee-option${isSelected ? ' selected' : ''}" data-id="${u.id}" data-type="user" data-name="${name}">
+                html += `<div class="assignee-option${isSelected ? ' selected' : ''}" data-id="${u.id}" data-type="user" data-name="${safeName}">
                     <span class="assignee-option-check">${isSelected ? '✓' : ''}</span>
-                    <span class="assignee-option-name">👤 ${name}</span>
+                    <span class="assignee-option-name">👤 ${safeName}</span>
                 </div>`;
             });
         }
@@ -1445,10 +1483,11 @@ const App = {
             html += `<div class="assignee-section-header">${this.t('config.assignee_groups_section')}</div>`;
             groups.forEach(g => {
                 const name = g.name || g.displayName || `Gruppo ${g.id}`;
+                const safeName = this.escapeHtml(name);
                 const isSelected = this.selectedAssignees.some(a => a.type === 'group' && a.id === g.id);
-                html += `<div class="assignee-option${isSelected ? ' selected' : ''}" data-id="${g.id}" data-type="group" data-name="${name}">
+                html += `<div class="assignee-option${isSelected ? ' selected' : ''}" data-id="${g.id}" data-type="group" data-name="${safeName}">
                     <span class="assignee-option-check">${isSelected ? '✓' : ''}</span>
-                    <span class="assignee-option-name">👥 ${name}</span>
+                    <span class="assignee-option-name">👥 ${safeName}</span>
                 </div>`;
             });
         }
@@ -1683,15 +1722,15 @@ const App = {
                     <input type="checkbox" data-index="${task.index}" ${task.selected ? 'checked' : ''} class="task-select-checkbox">
                 </td>
                 <td class="col-client">
-                    ${task.clientName}
-                    <span>ID: ${task.contactId}</span>
+                    ${this.escapeHtml(task.clientName)}
+                    <span>ID: ${this.escapeHtml(task.contactId)}</span>
                 </td>
                 <td class="col-badge">
                     <span class="freq-badge freq-${task.recurrence}">${task.recurrence}</span>
                 </td>
                 <td class="col-date">${this.formatDateLabel(task.startValidityDate)}${task.usedFallbackDate ? ` <span class="fallback-badge" title="${this.t('preview.fallback_badge_title')}"><i class="fa-solid fa-triangle-exclamation"></i></span>` : ''}</td>
                 <td class="col-range">${this.formatDateLabel(task.plannedStart)} – ${this.formatDateLabel(task.plannedEnd)}</td>
-                <td class="col-title">${task.title}</td>
+                <td class="col-title">${this.escapeHtml(task.title)}</td>
                 <td class="col-actions">
                     <button type="button" class="btn-icon btn-edit-task" data-index="${task.index}" title="${this.t('generator.edit_title')}">
                         <i class="fa-solid fa-pen-to-square"></i>
