@@ -391,9 +391,12 @@ textarea:focus {
     padding-right: 48px;
 }
 
-.btn-icon {
+.input-with-action .btn-icon {
     position: absolute;
     right: 8px;
+}
+
+.btn-icon {
     background: transparent;
     border: none;
     color: var(--text-muted);
@@ -401,6 +404,9 @@ textarea:focus {
     padding: 8px;
     border-radius: var(--border-radius-sm);
     transition: var(--transition-smooth);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn-icon:hover {
@@ -1378,6 +1384,7 @@ input:checked + .slider:before {
 .col-date { font-family: monospace; font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; }
 .col-range { font-family: monospace; font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
 .col-title { font-weight: 500; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
+.col-actions { width: 60px; text-align: center; }
 
 .action-footer {
     display: flex;
