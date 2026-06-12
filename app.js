@@ -133,8 +133,10 @@ const TRANSLATIONS = {
         'log.connected': 'Conexión exitosa. ¡Bienvenido {name}!',
         'log.types_found': 'Encontrados {n} tipos MANTENIMIENTO: {names}.',
         'log.type_contacts': '{name}: {n} contactos encontrados.',
-        'log.loading_jobs': 'Cargando proyectos para {n} contactos...',
-        'log.jobs_progress': 'Proyectos {i}/{n}...',
+        'log.loading_contract_dates': 'Cargando datos de contrato para {n} contactos...',
+        'log.contract_dates_progress': 'Contratos {i}/{n}...',
+        'log.bulk_loading_jobs': 'Cargando proyectos para {n} contactos seleccionados...',
+        'log.bulk_jobs_progress': 'Proyecto cargado para {client} (jobId {id})',
         'log.load_complete': 'Carga completada: {n} clientes en total.',
         'log.schedule_done': 'Calendario generado: {n} tareas para {c} clientes.',
         'log.contract_dates_summary': 'Fechas de contrato: {withDate} contactos con fecha, {fallback} sin fecha (usarán la fecha fallback).',
@@ -161,7 +163,7 @@ const TRANSLATIONS = {
         'loading.loading': 'Cargando...',
         'loading.generating': 'Generando...',
         'loading.type': 'Cargando {name}...',
-        'loading.jobs_btn': 'Proyectos {i}/{n}...',
+        'loading.details_btn': 'Contratos {i}/{n}...',
     },
     it: {
         // Page
@@ -290,8 +292,10 @@ const TRANSLATIONS = {
         'log.connected': 'Connessione riuscita. Benvenuto {name}!',
         'log.types_found': 'Trovati {n} tipi MANUTENZIONE: {names}.',
         'log.type_contacts': '{name}: {n} contatti trovati.',
-        'log.loading_jobs': 'Caricamento commesse per {n} contatti...',
-        'log.jobs_progress': 'Commesse {i}/{n}...',
+        'log.loading_contract_dates': 'Caricamento dati contratto per {n} contatti...',
+        'log.contract_dates_progress': 'Contratti {i}/{n}...',
+        'log.bulk_loading_jobs': 'Caricamento commesse per {n} contatti selezionati...',
+        'log.bulk_jobs_progress': 'Commessa caricata per {client} (jobId {id})',
         'log.load_complete': 'Caricamento completato: {n} clienti in totale.',
         'log.schedule_done': 'Calendario generato: {n} incarichi per {c} clienti.',
         'log.contract_dates_summary': 'Date contratto: {withDate} contatti con data, {fallback} senza data (useranno la data fallback).',
@@ -318,7 +322,7 @@ const TRANSLATIONS = {
         'loading.loading': 'Caricamento...',
         'loading.generating': 'Generazione...',
         'loading.type': 'Caricamento {name}...',
-        'loading.jobs_btn': 'Commesse {i}/{n}...',
+        'loading.details_btn': 'Contratti {i}/{n}...',
     }
 };
 
@@ -867,6 +871,17 @@ const App = {
         document.getElementById('btn-load-contacts').addEventListener('click', () => this.loadMaintenanceContacts());
         document.getElementById('btn-reset-contacts').addEventListener('click', () => this.resetContacts());
 
+        // Contact search & selection (bound once — NOT inside loadMaintenanceContacts)
+        document.getElementById('contact-search-input').addEventListener('input', (e) => {
+            this.renderContactList(e.target.value);
+        });
+        document.getElementById('btn-contacts-select-visible').addEventListener('click', () => {
+            this.toggleVisibleContacts(true);
+        });
+        document.getElementById('btn-contacts-deselect-visible').addEventListener('click', () => {
+            this.toggleVisibleContacts(false);
+        });
+
         // Generator
         document.getElementById('btn-generate-schedule').addEventListener('click', () => this.generateSchedule());
         document.getElementById('preview-search').addEventListener('input', (e) => this.filterPreview(e.target.value));
@@ -1150,15 +1165,15 @@ const App = {
                 this.log(this.t('log.type_contacts', { name: type.typologyName, n: totalForType }), 'info');
             }
 
-            // Step 3: Fetch first job + maintenance contract date for each contact
+            // Step 3: Resolve maintenance contract date for each contact
+            // (Job/commessa loading is deferred to bulk creation for speed.)
             const contactsArr = [...contactsMap.values()];
-            this.log(this.t('log.loading_jobs', { n: contactsArr.length }), 'info');
+            this.log(this.t('log.loading_contract_dates', { n: contactsArr.length }), 'info');
             const btnSpan2 = btn.querySelector('span');
             let diagDone = false;
             for (let i = 0; i < contactsArr.length; i++) {
                 const c = contactsArr[i];
-                if (btnSpan2) btnSpan2.textContent = this.t('loading.jobs_btn', { i: i + 1, n: contactsArr.length });
-                c.jobId = await this.client.getFirstJobForContact(c.contactId);
+                if (btnSpan2) btnSpan2.textContent = this.t('loading.details_btn', { i: i + 1, n: contactsArr.length });
 
                 // Resolve the maintenance contract date. If the search payload
                 // didn't carry it, fetch the full contact detail and read it there.
@@ -1239,18 +1254,7 @@ const App = {
             document.getElementById('contacts-list-section').classList.remove('hidden');
             this.renderContactList('');
 
-            // Bind contact search
-            document.getElementById('contact-search-input').addEventListener('input', (e) => {
-                this.renderContactList(e.target.value);
-            });
 
-            // Bind select/deselect visible buttons
-            document.getElementById('btn-contacts-select-visible').addEventListener('click', () => {
-                this.toggleVisibleContacts(true);
-            });
-            document.getElementById('btn-contacts-deselect-visible').addEventListener('click', () => {
-                this.toggleVisibleContacts(false);
-            });
 
             document.getElementById('contacts-success-info').classList.remove('hidden');
             document.getElementById('contacts-breakdown').classList.remove('hidden');
@@ -1473,19 +1477,6 @@ const App = {
 
         let html = '';
 
-        if (users.length > 0) {
-            html += `<div class="assignee-section-header">${this.t('config.assignee_users_section')}</div>`;
-            users.forEach(u => {
-                const name = u.displayName || `${u.firstName || ''} ${u.lastName || ''}`.trim();
-                const safeName = this.escapeHtml(name);
-                const isSelected = this.selectedAssignees.some(a => a.type === 'user' && a.id === u.id);
-                html += `<div class="assignee-option${isSelected ? ' selected' : ''}" data-id="${u.id}" data-type="user" data-name="${safeName}">
-                    <span class="assignee-option-check">${isSelected ? '✓' : ''}</span>
-                    <span class="assignee-option-name">👤 ${safeName}</span>
-                </div>`;
-            });
-        }
-
         if (groups.length > 0) {
             html += `<div class="assignee-section-header">${this.t('config.assignee_groups_section')}</div>`;
             groups.forEach(g => {
@@ -1495,6 +1486,19 @@ const App = {
                 html += `<div class="assignee-option${isSelected ? ' selected' : ''}" data-id="${g.id}" data-type="group" data-name="${safeName}">
                     <span class="assignee-option-check">${isSelected ? '✓' : ''}</span>
                     <span class="assignee-option-name">👥 ${safeName}</span>
+                </div>`;
+            });
+        }
+
+        if (users.length > 0) {
+            html += `<div class="assignee-section-header">${this.t('config.assignee_users_section')}</div>`;
+            users.forEach(u => {
+                const name = u.displayName || `${u.firstName || ''} ${u.lastName || ''}`.trim();
+                const safeName = this.escapeHtml(name);
+                const isSelected = this.selectedAssignees.some(a => a.type === 'user' && a.id === u.id);
+                html += `<div class="assignee-option${isSelected ? ' selected' : ''}" data-id="${u.id}" data-type="user" data-name="${safeName}">
+                    <span class="assignee-option-check">${isSelected ? '✓' : ''}</span>
+                    <span class="assignee-option-name">👤 ${safeName}</span>
                 </div>`;
             });
         }
@@ -1584,7 +1588,7 @@ const App = {
                 // Skip types that have been unchecked in the breakdown filter
                 if (contact.enabled === false) return;
 
-                const { contactId, clientName, recurrenceCode, jobId } = contact;
+                const { contactId, clientName, recurrenceCode, jobId = null } = contact;
 
                 let monthsFrequency = 0;
                 switch (recurrenceCode) {
@@ -1921,6 +1925,37 @@ const App = {
                     this.log(this.t('log.project_warn', { client: t.clientName, msg: err.message }), 'warning');
                 }
                 await this.delay(100);
+            }
+        }
+
+        // Load jobs (commesse) for selected contacts that don't have one yet
+        const contactsNeedingJob = [...new Map(
+            tasksToCreate
+                .filter(t => t.jobId == null)
+                .map(t => [t.contactId, t])
+        ).values()];
+
+        if (contactsNeedingJob.length > 0 && !projectName) {
+            // Only load existing jobs if we're NOT creating a new project
+            this.log(this.t('log.bulk_loading_jobs', { n: contactsNeedingJob.length }), 'info');
+            for (const t of contactsNeedingJob) {
+                if (this.cancelExecution) break;
+                try {
+                    const jobId = await this.client.getFirstJobForContact(t.contactId);
+                    if (jobId) {
+                        // Update all tasks for this contact
+                        tasksToCreate.forEach(task => {
+                            if (task.contactId === t.contactId) task.jobId = jobId;
+                        });
+                        // Also update contactsData for consistency
+                        const contactData = this.contactsData.find(c => c.contactId === t.contactId);
+                        if (contactData) contactData.jobId = jobId;
+                        this.log(this.t('log.bulk_jobs_progress', { client: t.clientName, id: jobId }), 'info');
+                    }
+                } catch (e) {
+                    // Non-blocking: tasks can be created without a job
+                }
+                await this.delay(50);
             }
         }
 
