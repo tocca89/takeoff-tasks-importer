@@ -1,61 +1,72 @@
-# TakeOff CRM — Recurring Task Generator
+# TakeOff CRM — Generatore di Incarichi Ricorrenti
 
-Un'applicazione web premium, interattiva e completamente client-side (SPA) progettata per calcolare, visualizzare ed eseguire la creazione massiva di task ricorrenti di manutenzione all'interno di **TakeOff CRM** partendo da un file Excel di clienti.
+Applicazione web client-side (SPA in Vanilla JS, nessun build step) per calcolare, visualizzare e creare in blocco gli **incarichi ricorrenti di manutenzione** dentro **TakeOff CRM**. I contatti vengono letti direttamente dall'API di TakeOff in base al loro tipo di manutenzione — niente Excel.
+
+Interfaccia **bilingue IT / ES** con tema corporate **nero + giallo `#ffd903` + bianco**.
 
 ---
 
 ## ✨ Funzionalità principali
 
-1. **Autenticazione Sicura**: Inserimento della chiave API (`x-api-key`) con validazione in tempo reale tramite chiamata all'endpoint `/api/me/infos`. La chiave viene salvata in modo sicuro nel `localStorage` del browser.
-2. **Parser Excel Integrato (SheetJS)**: Caricamento tramite Drag & Drop di file Excel con conversione in-browser (nessun dato sensibile viene trasmesso a server esterni). Mappatura automatica ed interattiva delle colonne per associare `Codice Cliente`, `Nome Cliente` e `Frequenza Manutenzione`.
-3. **Download Template di Esempio**: Generazione al volo e download di un file Excel di esempio (`.xlsx`) per agevolare la preparazione dei dati.
-4. **Motore di Ricorrenza Temporale**: Calcolo automatico e cronologico dei cicli di manutenzione. L'applicazione determina con precisione la **Data di Attivazione** e calcola il periodo di **Pianificazione** (Inizio e Fine) per farlo ricadere nell'**ultimo mese** di ciascun intervallo specifico.
-5. **Anteprima dello Scadenziario**: Tabella interattiva e filtrabile per abilitare/disabilitare i singoli task e tasto di modifica rapida per correggere le date o i titoli a livello di singola scadenza prima dell'invio.
-6. **Creazione in Blocco a Coda Controllata (Throttling)**: Processo asincrono di creazione tramite coda che limita le chiamate contemporanee (concurrency = 2) ed inserisce un ritardo controllato (180ms) per prevenire fenomeni di rate-limiting e garantire il 100% di successo nell'elaborazione API. Console dei log in tempo reale per monitorare i dettagli di ogni richiesta.
+1. **Autenticazione API** — chiave `x-api-key` validata in tempo reale (`/api/me/infos`), salvata nel `localStorage`. Proxy CORS opzionale per l'uso in locale.
+2. **Caricamento contatti dal CRM** — carica i contatti che hanno un tipo nel gruppo **MANUTENZIONE** (Mensile, Bimestrale, Trimestrale, Quadrimestrale, Semestrale, Annuale, sia in IT che ES).
+3. **Data di inizio dal contatto** — il ciclo di ogni contatto parte dalla custom property **`Fecha Contrato Mantenimiento`** (letta dal dettaglio contatto). In assenza, si usa la data di fallback impostata a mano.
+4. **Selezione granulare** — filtro per tipo di ricorrenza (per rigenerare solo i tipi nuovi) e selezione individuale dei contatti con ricerca e check multiplo.
+5. **Assegnazione multipla** — ogni incarico può essere assegnato a **un utente, più utenti, un gruppo o qualsiasi combinazione** (campo `assignedEntityIds`, formato `us_<id>` / `gr_<id>`).
+6. **Anteprima dello scadenziario** — tabella interattiva filtrabile, con abilita/disabilita per riga e modifica rapida di date e titolo prima dell'invio.
+7. **Controllo duplicati opzionale** — prima di creare, verifica via `POST /api/tasks/search` se esiste già un incarico dello stesso tipo nello stesso periodo per quel contatto (a prescindere dall'assegnatario).
+8. **Creazione in blocco con throttling** — coda asincrona a concorrenza limitata (2) con ritardo controllato per evitare rate-limiting; console di log in tempo reale e riepilogo (creati / saltati / errori).
 
 ---
 
-## 📅 Logica di Calcolo delle Date
+## 📅 Logica di calcolo delle date
 
-Il motore calcola le date per ciascun cliente in base alla legenda delle manutenzioni:
-* **M** (Mensile): Frequenza 1 mese.
-* **B** (Bimestrale): Frequenza 2 mesi.
-* **T** (Trimestrale): Frequenza 3 mesi.
-* **S** (Semestrale): Frequenza 6 mesi.
-* **A** (Annuale): Frequenza 12 mesi.
+Frequenze: **M**=1 mese, **B**=2, **T**=3, **C**=4 (quadrimestrale), **S**=6, **A**=12.
 
-*Esempio per ciclo Trimestrale con data d'inizio 1 Giugno 2026:*
-- **Ciclo completo**: dal 01/06/2026 al 31/08/2026 (3 mesi).
-- **Activation Date (`startValidityDate`)**: `01/06/2026 00:00` (Stato attivazione: *"Válido a partir de fecha"* / `10`).
-- **Inizio Pianificazione (`plannedStart`)**: `01/08/2026` (Primo giorno dell'ultimo mese del trimestre).
-- **Fine Pianificazione (`plannedEnd`)**: `31/08/2026` (Ultimo giorno dell'ultimo mese del trimestre).
+Per ogni contatto il ciclo parte dalla sua data di contratto. Il **periodo di pianificazione** copre l'intero ciclo: dalla data di attivazione al giorno precedente l'inizio del ciclo successivo.
+
+*Esempio — manutenzione mensile con contratto dal **11/06/2026**:*
+
+| Ciclo | Data di attivazione (`startValidityDate`) | Pianificazione (`plannedStart` – `plannedEnd`) |
+|------|------|------|
+| 1 | 11/06/2026 | 11/06/2026 – 10/07/2026 |
+| 2 | 11/07/2026 | 11/07/2026 – 10/08/2026 |
+| … | … | … |
+
+*Trimestrale dal 11/06 → ciclo 1: 11/06 – 10/09, ciclo 2: 11/09 – 10/12, ecc.*
+
+Ogni incarico viene creato con stato di attivazione **"Válido a partir de fecha"** (`taskValidityType: 10`) e `startValidityDate` pari al primo giorno del ciclo. Le date sono inviate in formato locale `YYYY-MM-DDTHH:mm:ss`.
 
 ---
 
-## 🛠️ Requisiti e Avvio Locale
+## 🛠️ Avvio locale
 
-L'applicazione è sviluppata in puro **HTML5, Vanilla CSS3 e Modern JavaScript (ES6)**. Non necessita di compilazione, build step o configurazioni di Node.js.
+Pura **HTML5 + CSS3 + JavaScript ES6**, nessuna compilazione.
 
-### Avvio Rapido (Doppio Clic)
-1. Scarica la cartella del progetto.
-2. Fai doppio clic su `index.html` per eseguirla all'istante all'interno di qualsiasi browser moderno.
-
-### Avvio Consigliato (Server Web Locale)
-Per evitare possibili restrizioni CORS del browser sui file locali durante le richieste API esterne, puoi servire la cartella usando una utility web leggera:
 ```bash
-# Esegui dalla cartella di progetto
+# dalla cartella di progetto
 npx serve .
 ```
-Apri poi l'indirizzo `http://localhost:3000` nel tuo browser.
+Apri `http://localhost:3000`. In locale, se compare l'errore "Failed to fetch", attiva il **Proxy CORS** dall'interfaccia. Su Vercel viene usato il rewrite integrato (`/api/takeoff/*`).
 
 ---
 
-## 📁 Struttura dei File
+## 📁 Struttura dei file
 
 ```
 takeoffes-ipce-tasks/
-├── index.html       # Interfaccia grafica, sezioni e modali
-├── style.css        # Stili e design system glassmorfico scuro
-├── app.js           # Motore di calcolo, parser Excel e integrazione API TakeOff
-└── README.md        # Documentazione tecnica e manuale d'uso (questo file)
+├── index.html   # Interfaccia, sezioni e modali
+├── style.css    # Design system (tema nero/giallo/bianco)
+├── app.js       # Traduzioni, client API TakeOff, motore date e creazione
+├── logo.png     # Logo TakeOff (header)
+├── vercel.json  # Rewrite API per il deploy su Vercel
+└── README.md    # Questo file
 ```
+
+---
+
+## 🔌 Note sull'API TakeOff
+
+- **Lettura incarichi**: usare `POST /api/tasks/search` (il `GET /api/tasks` è sovra-filtrato ed esclude gli incarichi futuri/non completati).
+- **Assegnatari**: campo `assignedEntityIds` con prefissi `us_` (utente) e `gr_` (gruppo). Non esiste un endpoint che elenca i gruppi: i gruppi con nome vengono ricavati dagli incarichi esistenti.
+- **Custom properties del contatto**: restituite solo dal dettaglio `GET /api/contacts/{id}`, non dalla ricerca contatti.

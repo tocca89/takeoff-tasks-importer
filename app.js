@@ -430,15 +430,32 @@ class TakeOffClient {
     }
 
     async getGroups() {
+        // TakeOff exposes NO groups-list endpoint (verified against its OpenAPI).
+        // Named user groups are harvested from existing tasks' assignee objects
+        // (assigneeType === 2). Ad-hoc groups that TakeOff auto-creates from
+        // multi-user assignments have comma-joined names and are excluded here —
+        // the user can still build those by multi-selecting individual users.
         try {
-            const response = await this.request('/api/user-groups', {
-                method: 'GET',
-                headers: this.getHeaders()
-            });
-            if (!response.ok) return [];
-            const data = await response.json();
-            const raw = data.value !== undefined ? data.value : data;
-            return Array.isArray(raw) ? raw : (raw.data || []);
+            const groups = new Map();
+            for (let skip = 0; skip < 600; skip += 200) {
+                const r = await this.request(`/api/tasks?skip=${skip}&take=200`, {
+                    method: 'GET',
+                    headers: this.getHeaders()
+                });
+                if (!r.ok) break;
+                const d = await r.json();
+                const v = d.value !== undefined ? d.value : d;
+                const arr = v.data !== undefined ? v.data : (Array.isArray(v) ? v : []);
+                arr.forEach(t => {
+                    const a = t.assignee;
+                    if (a && a.assigneeType === 2 && a.displayName &&
+                        !a.displayName.includes(',') && !groups.has(a.id)) {
+                        groups.set(a.id, { id: a.id, name: a.displayName });
+                    }
+                });
+                if (arr.length < 200) break;
+            }
+            return [...groups.values()];
         } catch (e) {
             return []; // groups are optional — fail silently
         }
@@ -529,22 +546,39 @@ class TakeOffClient {
     }
 
     async taskExistsInPeriod(contactId, taskTypeId, plannedStartIso, plannedEndIso) {
-        // Returns true if at least one task of the given type already exists
-        // for this contact overlapping the planned period.
+        // Returns true if a task of the given type already exists for this
+        // contact starting within the same maintenance cycle.
         // On any API error we return false so creation is never blocked.
         try {
-            const startDate = plannedStartIso.substring(0, 10); // YYYY-MM-DD
-            const endDate   = plannedEndIso.substring(0, 10);
-            const qs = `contactId=${contactId}&taskTypeId=${taskTypeId}&plannedStartFrom=${startDate}&plannedEndTo=${endDate}&skip=0&take=1`;
-            const response = await this.request(`/api/tasks?${qs}`, {
-                method: 'GET',
-                headers: this.getHeaders()
+            const periodStart = new Date(plannedStartIso.substring(0, 10) + 'T00:00:00');
+            const periodEnd   = new Date(plannedEndIso.substring(0, 10) + 'T23:59:59');
+
+            // MUST use POST /api/tasks/search, NOT GET /api/tasks:
+            //  - GET /api/tasks is over-filtered (it omits non-completed/future
+            //    tasks, so it never returned the maintenance tasks we create);
+            //  - the CORS proxy caches GET responses and served stale data.
+            // POST search returns ALL matching tasks and filters by type server-side.
+            const response = await this.request('/api/tasks/search', {
+                method: 'POST',
+                headers: this.getHeaders(),
+                body: JSON.stringify({
+                    contactId:   parseInt(contactId),
+                    taskTypeIds: [parseInt(taskTypeId)],
+                    skip: 0,
+                    take: 200
+                })
             });
             if (!response.ok) return false;
-            const data = await response.json();
+            const data  = await response.json();
             const val   = data.value !== undefined ? data.value : data;
             const tasks = val.data !== undefined ? val.data : (Array.isArray(val) ? val : []);
-            return tasks.length > 0;
+
+            // Server already filtered by type; match the cycle by plannedStart.
+            return tasks.some(t => {
+                if (!t.plannedStart) return false;
+                const ps = new Date(t.plannedStart);
+                return ps >= periodStart && ps <= periodEnd;
+            });
         } catch (e) {
             return false; // fail-safe: never block creation on a failed check
         }
@@ -1525,9 +1559,12 @@ const App = {
                     const startValidityDate = this.addMonths(baseStartDate, i);
                     if (startValidityDate >= limitDate) break;
 
-                    const planningMonthStart = this.addMonths(baseStartDate, i + (monthsFrequency - 1));
-                    const plannedStart = new Date(planningMonthStart.getFullYear(), planningMonthStart.getMonth(), 1);
-                    const plannedEnd   = new Date(planningMonthStart.getFullYear(), planningMonthStart.getMonth() + 1, 0);
+                    // Planning period = the full maintenance cycle: from the
+                    // activation date to the day before the next cycle starts.
+                    // e.g. monthly from 11/06 -> 11/06–10/07, quarterly -> 11/06–10/09.
+                    const nextCycleStart = this.addMonths(baseStartDate, i + monthsFrequency);
+                    const plannedStart   = new Date(startValidityDate);
+                    const plannedEnd     = new Date(nextCycleStart.getFullYear(), nextCycleStart.getMonth(), nextCycleStart.getDate() - 1);
 
                     const variables = {
                         '{cliente}':          clientName,
@@ -1838,14 +1875,17 @@ const App = {
         }
 
         const queue = [...tasksToCreate];
-        const workerIds      = this.selectedAssignees.filter(a => a.type === 'user').map(a => a.id);
-        const workerGroupIds = this.selectedAssignees.filter(a => a.type === 'group').map(a => a.id);
+        // TakeOff assigns via assignedEntityIds: prefixed string ids,
+        // "us_<id>" for users and "gr_<id>" for groups. The array supports
+        // multiple assignees (any mix of users and groups).
+        const assignedEntityIds = this.selectedAssignees
+            .filter(a => a && (a.type === 'user' || a.type === 'group'))
+            .map(a => `${a.type === 'user' ? 'us' : 'gr'}_${a.id}`);
 
         const workerParams = {
             taskTypeId: parseInt(taskTypeId),
             statusId:   parseInt(statusId),
-            workerIds,
-            workerGroupIds,
+            assignedEntityIds,
             priority,
             important,
             jobOverrideMap,
@@ -1883,6 +1923,13 @@ const App = {
                 const plannedStartIso = this.formatDateTimeIsoLocal(task.plannedStart);
                 const plannedEndIso   = this.formatDateTimeIsoLocal(task.plannedEnd);
 
+                // Activation date = first day of each maintenance cycle.
+                // Use the same LOCAL datetime format as plannedStart/End — sending
+                // toISOString() (UTC "Z" + ms) is what previously caused a 400.
+                const startValidityIso = (task.startValidityDate instanceof Date && !isNaN(task.startValidityDate))
+                    ? this.formatDateTimeIsoLocal(task.startValidityDate)
+                    : null;
+
                 // Optional duplicate check
                 if (params.checkExisting) {
                     const exists = await this.client.taskExistsInPeriod(
@@ -1911,8 +1958,10 @@ const App = {
                     plannedEnd:     plannedEndIso,
                     completeBefore: plannedEndIso,
                     creatorUserId:  this.connectedUser.id,
-                    ...(params.workerIds.length > 0      && { workerIds: params.workerIds }),
-                    ...(params.workerGroupIds.length > 0 && { workerGroupIds: params.workerGroupIds }),
+                    ...(params.assignedEntityIds.length > 0 && { assignedEntityIds: params.assignedEntityIds }),
+                    // Task activation: "Válido a partir de fecha" (taskValidityType 10),
+                    // activated from the first day of the maintenance cycle.
+                    ...(startValidityIso && { taskValidityType: 10, startValidityDate: startValidityIso }),
                 };
 
                 await this.client.createTask(payload);
