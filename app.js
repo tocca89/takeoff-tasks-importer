@@ -133,8 +133,8 @@ const TRANSLATIONS = {
         'log.connected': 'Conexión exitosa. ¡Bienvenido {name}!',
         'log.types_found': 'Encontrados {n} tipos MANTENIMIENTO: {names}.',
         'log.type_contacts': '{name}: {n} contactos encontrados.',
-        'log.loading_jobs': 'Cargando commessas para {n} contactos...',
-        'log.jobs_progress': 'Commessas {i}/{n}...',
+        'log.loading_jobs': 'Cargando proyectos para {n} contactos...',
+        'log.jobs_progress': 'Proyectos {i}/{n}...',
         'log.load_complete': 'Carga completada: {n} clientes en total.',
         'log.schedule_done': 'Calendario generado: {n} tareas para {c} clientes.',
         'log.contract_dates_summary': 'Fechas de contrato: {withDate} contactos con fecha, {fallback} sin fecha (usarán la fecha fallback).',
@@ -161,7 +161,7 @@ const TRANSLATIONS = {
         'loading.loading': 'Cargando...',
         'loading.generating': 'Generando...',
         'loading.type': 'Cargando {name}...',
-        'loading.jobs_btn': 'Commessas {i}/{n}...',
+        'loading.jobs_btn': 'Proyectos {i}/{n}...',
     },
     it: {
         // Page
@@ -1574,6 +1574,12 @@ const App = {
             const localeLang    = this.lang === 'it' ? 'it-IT' : 'es-ES';
             let fallbackCount   = 0;
 
+            // Never recreate past maintenances: only cycles whose activation is
+            // today or later are generated, within a window of `durationMonths`
+            // from today. The contract date still anchors the cadence/day-of-month.
+            const today     = new Date(); today.setHours(0, 0, 0, 0);
+            const windowEnd = this.addMonths(today, this.durationMonths);
+
             this.contactsData.forEach(contact => {
                 // Skip types that have been unchecked in the breakdown filter
                 if (contact.enabled === false) return;
@@ -1596,14 +1602,17 @@ const App = {
                 const usedFallback  = !contact.contractStartDate;
                 if (usedFallback) fallbackCount++;
                 const baseStartDate = contact.contractStartDate || fallbackStart;
-                const limitDate     = this.addMonths(baseStartDate, this.durationMonths);
 
                 // Use the UI language for the recurrence label in templates
                 const recLabel = this.t('rec.' + recurrenceCode);
 
-                for (let i = 0; i < this.durationMonths; i += monthsFrequency) {
+                // Walk the cadence anchored on the contract date, skipping past
+                // cycles and stopping at the end of the from-today window.
+                for (let i = 0; ; i += monthsFrequency) {
                     const startValidityDate = this.addMonths(baseStartDate, i);
-                    if (startValidityDate >= limitDate) break;
+                    if (startValidityDate >= windowEnd) break;   // past the window
+                    if (i > 12 * 300) break;                      // safety net
+                    if (startValidityDate < today) continue;      // never recreate past cycles
 
                     // Planning period = the full maintenance cycle: from the
                     // activation date to the day before the next cycle starts.
