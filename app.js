@@ -87,6 +87,8 @@ const TRANSLATIONS = {
         'generator.edit_title': 'Editar tarea',
         'generator.check_existing_label': 'Verificar tareas existentes antes de crear',
         'generator.check_existing_hint': 'Más lento pero evita duplicados si algunos contactos ya fueron procesados.',
+        'generator.calendar_month_label': 'Período de referencia: mes solar',
+        'generator.calendar_month_hint': 'Si está activo, la planificación y la fecha de activación se alinearán con el primer y el último día del mes solar (ej. del 01 al 30/31).',
         // Progress modal
         'progress.title': 'Creación de Tareas en Curso...',
         'progress.success_label': 'Creadas con Éxito',
@@ -249,6 +251,8 @@ const TRANSLATIONS = {
         'generator.edit_title': 'Modifica incarico',
         'generator.check_existing_label': 'Verifica incarichi esistenti prima di creare',
         'generator.check_existing_hint': 'Più lento ma evita duplicati se alcuni contatti sono già stati elaborati.',
+        'generator.calendar_month_label': 'Periodo di riferimento: mese solare',
+        'generator.calendar_month_hint': 'Se attivo, la pianificazione e la data di attivazione si allineeranno sempre al primo e all\'ultimo giorno del mese solare (es. dal 01 al 30/31).',
         // Progress modal
         'progress.title': 'Creazione Incarichi in Corso...',
         'progress.success_label': 'Creati con Successo',
@@ -1569,6 +1573,7 @@ const App = {
         }
 
         const offsetDaysInput = parseInt(document.getElementById('input-activation-offset').value) || 0;
+        const useCalendarMonth = !!document.getElementById('input-calendar-month')?.checked;
 
         const btn = document.getElementById('btn-generate-schedule');
         const originalHtml = btn.innerHTML;
@@ -1630,10 +1635,17 @@ const App = {
                     // activation date to the day before the next cycle starts.
                     // e.g. monthly from 11/06 -> 11/06–10/07, quarterly -> 11/06–10/09.
                     const nextCycleStart = this.addMonths(baseStartDate, i + monthsFrequency);
-                    const plannedStart   = new Date(cycleStartDate);
-                    const plannedEnd     = new Date(nextCycleStart.getFullYear(), nextCycleStart.getMonth(), nextCycleStart.getDate() - 1);
+                    let plannedStart, plannedEnd;
+                    if (useCalendarMonth) {
+                        plannedStart = new Date(cycleStartDate.getFullYear(), cycleStartDate.getMonth(), 1);
+                        plannedEnd   = new Date(nextCycleStart.getFullYear(), nextCycleStart.getMonth(), 0);
+                    } else {
+                        plannedStart = new Date(cycleStartDate);
+                        plannedEnd   = new Date(nextCycleStart.getFullYear(), nextCycleStart.getMonth(), nextCycleStart.getDate() - 1);
+                    }
 
-                    const actualActivationDate = new Date(offsetDaysInput > 0 ? plannedEnd : cycleStartDate);
+                    const activationAnchor = useCalendarMonth ? plannedStart : cycleStartDate;
+                    const actualActivationDate = new Date(offsetDaysInput > 0 ? plannedEnd : activationAnchor);
                     if (offsetDaysInput > 0) {
                         actualActivationDate.setDate(actualActivationDate.getDate() - offsetDaysInput);
                     }
