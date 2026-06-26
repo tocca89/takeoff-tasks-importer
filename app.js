@@ -100,6 +100,7 @@ const TRANSLATIONS = {
         'progress.copy_title': 'Copiar registro',
         'progress.stop_btn': 'Interrumpir',
         'progress.close_btn': 'Cerrar',
+        'progress.rollback_btn': 'Deshacer creación (Rollback)',
         // Edit modal
         'edit.title': 'Editar Vencimiento Individual',
         'edit.task_title_label': 'Título de la Tarea',
@@ -127,6 +128,8 @@ const TRANSLATIONS = {
         'alert.copied': '¡Registro copiado al portapapeles!',
         'alert.contacts_error': 'Error al cargar los contactos:\n{msg}',
         'alert.schedule_error': 'Error al generar el calendario: {msg}',
+        'alert.rollback_confirm': '¿Estás seguro de que deseas eliminar las {n} tareas creadas en esta ejecución?',
+        'alert.rollback_complete': 'Rollback completado.\nEliminadas con éxito: {success}\nErrores: {failure}',
         // Log messages
         'log.cors_activated': 'Conexión directa fallida. Activando Proxy CORS automáticamente...',
         'log.cors_toggle': 'Proxy CORS {state} manualmente.',
@@ -160,6 +163,10 @@ const TRANSLATIONS = {
         'log.complete': '¡Completado! Creadas: {success}, Saltadas: {skipped}, Errores: {failure}.',
         'log.stop_cmd': 'Comando de interrupción enviado...',
         'log.task_edited': 'Tarea #{n} ({client}) modificada manualmente.',
+        'log.rollback_start': 'Iniciando rollback de {n} tareas...',
+        'log.rollback_ok': 'OK: Tarea {id} eliminada.',
+        'log.rollback_err': 'ERR: No se pudo eliminar la tarea {id}: {msg}',
+        'log.rollback_complete': 'Rollback completado. Eliminadas: {success}, Errores: {failure}.',
         // Error messages (thrown by TakeOffClient wrappers)
         'error.no_maint_types': 'No se encontraron tipos de contacto MANTENIMIENTO. Verifica que los tipos estén configurados en TakeOff (Mensual, Bimestral, Trimestral, Cuadrimestral, Semestral, Anual).',
         'error.no_contacts_assigned': 'Tipos encontrados ({names}), pero ningún contacto tiene aún uno de estos tipos asignado. Asigna los tipos MANTENIMIENTO a los contactos en TakeOff CRM e inténtalo de nuevo.',
@@ -169,6 +176,7 @@ const TRANSLATIONS = {
         'loading.generating': 'Generando...',
         'loading.type': 'Cargando {name}...',
         'loading.details_btn': 'Contratos {i}/{n}...',
+        'loading.rollback': 'Deshaciendo...',
     },
     it: {
         // Page
@@ -264,6 +272,7 @@ const TRANSLATIONS = {
         'progress.copy_title': 'Copia registro',
         'progress.stop_btn': 'Interrompi',
         'progress.close_btn': 'Chiudi',
+        'progress.rollback_btn': 'Annulla inserimenti (Rollback)',
         // Edit modal
         'edit.title': 'Modifica Scadenza Individuale',
         'edit.task_title_label': 'Titolo Incarico',
@@ -291,11 +300,13 @@ const TRANSLATIONS = {
         'alert.copied': 'Registro copiato negli appunti!',
         'alert.contacts_error': 'Errore nel caricamento contatti:\n{msg}',
         'alert.schedule_error': 'Errore nella generazione calendario: {msg}',
+        'alert.rollback_confirm': 'Sei sicuro di voler eliminare i {n} incarichi creati in questa esecuzione?',
+        'alert.rollback_complete': 'Rollback completato.\nEliminati con successo: {success}\nErrori: {failure}',
         // Log messages
         'log.cors_activated': 'Connessione diretta fallita. Attivazione Proxy CORS automatica...',
         'log.cors_toggle': 'Proxy CORS {state} manualmente.',
         'log.cors_on': 'attivato',
-        'log.cors_off': 'disattivato',
+        'log.cors_off': 'desattivato',
         'log.lookups_loaded': 'Dati di configurazione caricati correttamente.',
         'log.lookups_error': 'Errore nel caricamento dati di configurazione: {msg}',
         'log.status_error': 'Errore nel caricamento stati: {msg}',
@@ -324,6 +335,10 @@ const TRANSLATIONS = {
         'log.complete': 'Completato! Creati: {success}, Saltati: {skipped}, Errori: {failure}.',
         'log.stop_cmd': 'Comando di interruzione inviato...',
         'log.task_edited': 'Incarico #{n} ({client}) modificato manualmente.',
+        'log.rollback_start': 'Avvio rollback di {n} incarichi...',
+        'log.rollback_ok': 'OK: Incarico {id} eliminato.',
+        'log.rollback_err': 'ERR: Impossibile eliminare l\'incarico {id}: {msg}',
+        'log.rollback_complete': 'Rollback completato. Eliminati: {success}, Errori: {failure}.',
         // Error messages
         'error.no_maint_types': 'Nessun tipo di contatto MANUTENZIONE trovato. Verifica che i tipi siano configurati su TakeOff (Mensile, Bimestrale, Trimestrale, Quadrimestrale, Semestrale, Annuale).',
         'error.no_contacts_assigned': 'Tipi trovati ({names}), ma nessun contatto ha ancora uno di questi tipi assegnato. Assegna i tipi MANUTENZIONE ai contatti in TakeOff CRM e riprova.',
@@ -333,6 +348,7 @@ const TRANSLATIONS = {
         'loading.generating': 'Generazione...',
         'loading.type': 'Caricamento {name}...',
         'loading.details_btn': 'Contratti {i}/{n}...',
+        'loading.rollback': 'Annullamento...',
     }
 };
 
@@ -644,6 +660,21 @@ class TakeOffClient {
         }
         return data.value !== undefined ? data.value : data;
     }
+
+    async deleteTask(taskId) {
+        const response = await this.request(`/api/tasks/${taskId}`, {
+            method: 'DELETE',
+            headers: this.getHeaders()
+        });
+        if (!response.ok) {
+            const rawText = await response.text().catch(() => '');
+            let data = {};
+            try { data = JSON.parse(rawText); } catch(e) {}
+            const errorMsg = data.result?.errors?.join(', ') || data.title || `HTTP ${response.status}`;
+            throw new Error(errorMsg);
+        }
+        return true;
+    }
 }
 
 /**
@@ -683,6 +714,7 @@ const App = {
     cancelExecution: false,
     activeWorkersCount: 0,
     stats: { success: 0, failure: 0, skipped: 0, total: 0, processed: 0 },
+    createdTaskIds: [],
 
     /**
      * 3. Internationalisation helpers
@@ -908,6 +940,7 @@ const App = {
         document.getElementById('btn-close-progress').addEventListener('click', () => {
             document.getElementById('progress-modal').classList.add('hidden');
         });
+        document.getElementById('btn-rollback-execution').addEventListener('click', () => this.rollbackExecution());
         document.getElementById('btn-copy-logs').addEventListener('click', () => this.copyConsoleLogs());
     },
 
@@ -1921,6 +1954,7 @@ const App = {
         this.isExecuting   = true;
         this.cancelExecution = false;
         this.stats = { success: 0, failure: 0, skipped: 0, total: tasksToCreate.length, processed: 0 };
+        this.createdTaskIds = [];
 
         document.getElementById('progress-ratio').textContent       = `0 / ${this.stats.total}`;
         document.getElementById('progress-bar-fill').style.width    = '0%';
@@ -1929,6 +1963,7 @@ const App = {
         document.getElementById('stats-skip-count').textContent     = '0';
         document.getElementById('stats-percent').textContent        = '0%';
         document.getElementById('btn-stop-execution').classList.remove('hidden');
+        document.getElementById('btn-rollback-execution').classList.add('hidden');
         document.getElementById('btn-close-progress').classList.add('hidden');
         document.getElementById('progress-modal').classList.remove('hidden');
 
@@ -2016,6 +2051,9 @@ const App = {
         this.isExecuting = false;
         document.getElementById('btn-stop-execution').classList.add('hidden');
         document.getElementById('btn-close-progress').classList.remove('hidden');
+        if (this.createdTaskIds && this.createdTaskIds.length > 0) {
+            document.getElementById('btn-rollback-execution').classList.remove('hidden');
+        }
 
         if (this.cancelExecution) {
             this.log(this.t('log.interrupted', { success: this.stats.success, skipped: this.stats.skipped, failure: this.stats.failure }), 'warning');
@@ -2089,7 +2127,10 @@ const App = {
                     }),
                 };
 
-                await this.client.createTask(payload);
+                const createdTask = await this.client.createTask(payload);
+                if (createdTask && createdTask.id) {
+                    this.createdTaskIds.push(createdTask.id);
+                }
                 this.stats.success++;
                 this.log(this.t('log.task_ok', { id: task.contactId, client: task.clientName, title: task.title }), 'success');
             } catch (err) {
@@ -2109,6 +2150,53 @@ const App = {
         this.cancelExecution = true;
         this.log(this.t('log.stop_cmd'), "warning");
         document.getElementById('btn-stop-execution').classList.add('hidden');
+    },
+
+    async rollbackExecution() {
+        if (!this.createdTaskIds || this.createdTaskIds.length === 0) return;
+
+        const count = this.createdTaskIds.length;
+        const confirmMsg = this.t('alert.rollback_confirm', { n: count });
+        if (!confirm(confirmMsg)) return;
+
+        const btnRollback = document.getElementById('btn-rollback-execution');
+        const btnClose = document.getElementById('btn-close-progress');
+        
+        btnRollback.disabled = true;
+        btnRollback.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${this.t('loading.rollback')}`;
+        btnClose.classList.add('hidden');
+
+        this.log(this.t('log.rollback_start', { n: count }), 'info');
+
+        let success = 0;
+        let failure = 0;
+
+        for (const taskId of this.createdTaskIds) {
+            try {
+                await this.client.deleteTask(taskId);
+                success++;
+                this.log(this.t('log.rollback_ok', { id: taskId }), 'success');
+            } catch (err) {
+                failure++;
+                this.log(this.t('log.rollback_err', { id: taskId, msg: err.message }), 'error');
+            }
+            await this.delay(100);
+        }
+
+        // Reset the created task IDs list since they've been deleted
+        this.createdTaskIds = [];
+
+        btnRollback.classList.add('hidden');
+        btnRollback.disabled = false;
+        btnRollback.innerHTML = this.t('progress.rollback_btn');
+        btnClose.classList.remove('hidden');
+
+        // Update success stats to show they were rolled back
+        this.stats.success = Math.max(0, this.stats.success - success);
+        this.updateProgressUi();
+
+        this.log(this.t('log.rollback_complete', { success, failure }), 'info');
+        alert(this.t('alert.rollback_complete', { success, failure }));
     },
 
     updateProgressUi() {
