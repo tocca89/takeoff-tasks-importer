@@ -176,71 +176,6 @@
                         </div>
                     </div>
                 </section>
-
-                <!-- PANEL 5: TASK MANAGEMENT & DELETION -->
-                <section class="glass-panel disabled" id="management-panel" style="margin-top: 24px;">
-                    <div class="panel-header">
-                        <div class="panel-title-icon"><i class="fa-solid fa-toolbox"></i></div>
-                        <h2 data-i18n="mgmt.title">Gestión y Eliminación de Tareas</h2>
-                    </div>
-                    <div class="panel-body">
-                        <!-- Sub-section 1: CSV Utilities -->
-                        <div class="mgmt-section-header">
-                            <h4 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                                <i class="fa-solid fa-file-csv" style="color: var(--accent);"></i>
-                                <span data-i18n="mgmt.csv_section">Utilidades CSV</span>
-                            </h4>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 16px;">
-                            <button type="button" id="btn-download-last-csv" class="btn btn-secondary btn-full disabled" disabled>
-                                <span class="btn-text" data-i18n="mgmt.download_last_btn">Descargar CSV Última Ejecución</span>
-                                <span class="btn-icon-right"><i class="fa-solid fa-download"></i></span>
-                            </button>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 20px;">
-                            <label data-i18n="mgmt.upload_csv_label" style="font-size: 0.85rem; font-weight: 500; display: block; margin-bottom: 8px;">Eliminar tareas desde archivo CSV</label>
-                            <input type="file" id="input-delete-csv-file" accept=".csv,.txt" style="display:none;">
-                            <button type="button" id="btn-trigger-file-upload" class="btn btn-warning btn-full">
-                                <span class="btn-text" data-i18n="mgmt.upload_csv_btn">Carica CSV ed Elimina</span>
-                                <span class="btn-icon-right"><i class="fa-solid fa-trash-can"></i></span>
-                            </button>
-                            <p class="field-hint" data-i18n="mgmt.csv_hint" style="margin-top: 6px;">Sube un archivo CSV con una columna ID para eliminar tareas en lote.</p>
-                        </div>
-
-                        <hr class="panel-divider">
-
-                        <!-- Sub-section 2: Future Tasks Deletion -->
-                        <div class="mgmt-section-header" style="margin-top: 20px;">
-                            <h4 style="display: flex; align-items: center; gap: 8px;">
-                                <i class="fa-solid fa-magnifying-glass-minus" style="color: var(--accent);"></i>
-                                <span data-i18n="mgmt.search_section">Buscar y Eliminar Tareas Futuras</span>
-                            </h4>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label for="select-mgmt-task-type" data-i18n="mgmt.task_type_label">Tipo de Tarea</label>
-                            <select id="select-mgmt-task-type">
-                                <option value="" data-i18n="mgmt.task_type_placeholder">Selecciona un tipo...</option>
-                            </select>
-                        </div>
-                        <div class="form-group" style="margin-bottom: 12px;">
-                            <label for="input-mgmt-date-from" data-i18n="mgmt.date_from_label">A partir de la fecha (inclusive)</label>
-                            <input type="date" id="input-mgmt-date-from">
-                        </div>
-                        <div class="form-group" style="margin-bottom: 16px;">
-                            <div class="checkbox-wrapper">
-                                <label class="switch">
-                                    <input type="checkbox" id="input-mgmt-only-uncompleted" checked>
-                                    <span class="slider round"></span>
-                                </label>
-                                <span class="switch-label" data-i18n="mgmt.only_uncompleted_label">Solo no completadas</span>
-                            </div>
-                        </div>
-                        <button type="button" id="btn-search-future-tasks" class="btn btn-accent btn-full">
-                            <span class="btn-text" data-i18n="mgmt.search_btn">Buscar Tareas Futuras</span>
-                            <span class="btn-icon-right"><i class="fa-solid fa-magnifying-glass"></i></span>
-                        </button>
-                    </div>
-                </section>
             </div>
 
             <!-- RIGHT COLUMN: CONTACTS LOADER & GENERATOR PREVIEW -->
@@ -414,6 +349,79 @@
                                 <button type="button" id="btn-bulk-create" class="btn btn-success btn-lg">
                                     <span class="btn-text" data-i18n="generator.create_btn">Crear en Bloque en TakeOff CRM</span>
                                     <span class="btn-icon-right"><i class="fa-solid fa-rocket"></i></span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL 5: TASK MANAGEMENT & DELETION -->
+                <section class="glass-panel disabled" id="management-panel" style="margin-top: 24px;">
+                    <div class="panel-header">
+                        <div class="panel-title-icon"><i class="fa-solid fa-toolbox"></i></div>
+                        <h2 data-i18n="mgmt.title">Gestión y Eliminación de Tareas</h2>
+                    </div>
+                    <div class="panel-body">
+                        <div class="mgmt-grid-row">
+                            <!-- Left Column: CSV Utilities -->
+                            <div class="mgmt-grid-col">
+                                <div class="mgmt-section-header">
+                                    <h4 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                                        <i class="fa-solid fa-file-csv" style="color: var(--accent);"></i>
+                                        <span data-i18n="mgmt.csv_section">Utilidades CSV</span>
+                                    </h4>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 16px;">
+                                    <button type="button" id="btn-download-last-csv" class="btn btn-secondary btn-full disabled" disabled>
+                                        <span class="btn-text" data-i18n="mgmt.download_last_btn">Descargar CSV Última Ejecución</span>
+                                        <span class="btn-icon-right"><i class="fa-solid fa-download"></i></span>
+                                    </button>
+                                </div>
+                                <div class="form-group">
+                                    <label data-i18n="mgmt.upload_csv_label" style="font-size: 0.85rem; font-weight: 500; display: block; margin-bottom: 8px;">Eliminar tareas desde archivo CSV</label>
+                                    <input type="file" id="input-delete-csv-file" accept=".csv,.txt" style="display:none;">
+                                    <button type="button" id="btn-trigger-file-upload" class="btn btn-warning btn-full">
+                                        <span class="btn-text" data-i18n="mgmt.upload_csv_btn">Carica CSV ed Elimina</span>
+                                        <span class="btn-icon-right"><i class="fa-solid fa-trash-can"></i></span>
+                                    </button>
+                                    <p class="field-hint" data-i18n="mgmt.csv_hint" style="margin-top: 6px;">Sube un archivo CSV con una columna ID para eliminar tareas en lote.</p>
+                                </div>
+                            </div>
+
+                            <div class="mgmt-grid-divider"></div>
+
+                            <!-- Right Column: Future Tasks Deletion -->
+                            <div class="mgmt-grid-col">
+                                <div class="mgmt-section-header">
+                                    <h4 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                                        <i class="fa-solid fa-magnifying-glass-minus" style="color: var(--accent);"></i>
+                                        <span data-i18n="mgmt.search_section">Buscar y Eliminar Tareas Futuras</span>
+                                    </h4>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group col-6" style="margin-bottom: 12px;">
+                                        <label for="select-mgmt-task-type" data-i18n="mgmt.task_type_label">Tipo de Tarea</label>
+                                        <select id="select-mgmt-task-type">
+                                            <option value="" data-i18n="mgmt.task_type_placeholder">Selecciona un tipo...</option>
+                                        </select>
+                                    </div>
+                                    <div class="form-group col-6" style="margin-bottom: 12px;">
+                                        <label for="input-mgmt-date-from" data-i18n="mgmt.date_from_label">A partir de la fecha</label>
+                                        <input type="date" id="input-mgmt-date-from">
+                                    </div>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 16px;">
+                                    <div class="checkbox-wrapper">
+                                        <label class="switch">
+                                            <input type="checkbox" id="input-mgmt-only-uncompleted" checked>
+                                            <span class="slider round"></span>
+                                        </label>
+                                        <span class="switch-label" data-i18n="mgmt.only_uncompleted_label">Solo no completadas</span>
+                                    </div>
+                                </div>
+                                <button type="button" id="btn-search-future-tasks" class="btn btn-accent btn-full">
+                                    <span class="btn-text" data-i18n="mgmt.search_btn">Buscar Tareas Futuras</span>
+                                    <span class="btn-icon-right"><i class="fa-solid fa-magnifying-glass"></i></span>
                                 </button>
                             </div>
                         </div>

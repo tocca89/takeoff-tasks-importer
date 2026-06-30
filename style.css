@@ -1719,3 +1719,33 @@ input:checked + .slider:before {
     margin: 0 0 8px 0;
     color: var(--text-color);
 }
+
+/* Management panel horizontal grid styling */
+.mgmt-grid-row {
+    display: flex;
+    gap: 32px;
+}
+
+.mgmt-grid-col {
+    flex: 1;
+    min-width: 0;
+}
+
+.mgmt-grid-divider {
+    width: 1px;
+    background-color: var(--border-color);
+    align-self: stretch;
+}
+
+/* Responsive collapse on mobile */
+@media (max-width: 768px) {
+    .mgmt-grid-row {
+        flex-direction: column;
+        gap: 24px;
+    }
+    .mgmt-grid-divider {
+        width: 100%;
+        height: 1px;
+        background-color: var(--border-color);
+    }
+}
