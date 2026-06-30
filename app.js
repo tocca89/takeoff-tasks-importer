@@ -177,6 +177,40 @@ const TRANSLATIONS = {
         'loading.type': 'Cargando {name}...',
         'loading.details_btn': 'Contratos {i}/{n}...',
         'loading.rollback': 'Deshaciendo...',
+        // Mgmt panel
+        'mgmt.title': 'Gestión y Eliminación de Tareas',
+        'mgmt.csv_section': 'Utilidades CSV',
+        'mgmt.download_last_btn': 'Descargar CSV Última Ejecución',
+        'mgmt.upload_csv_label': 'Eliminar tareas desde archivo CSV',
+        'mgmt.upload_csv_btn': 'Subir CSV y Eliminar',
+        'mgmt.csv_hint': 'Sube un archivo CSV con una columna ID para eliminar tareas en lote.',
+        'mgmt.search_section': 'Buscar y Eliminar Tareas Futuras',
+        'mgmt.task_type_label': 'Tipo de Tarea',
+        'mgmt.task_type_placeholder': 'Selecciona un tipo de tarea...',
+        'mgmt.date_from_label': 'A partir de la fecha (inclusive)',
+        'mgmt.only_uncompleted_label': 'Solo tareas no completadas',
+        'mgmt.search_btn': 'Buscar Tareas Futuras',
+        // Mgmt delete modal
+        'mgmt.delete_title': 'Confirmar Eliminación de Tareas',
+        'mgmt.tasks_found': 'Tareas Encontradas',
+        'mgmt.tasks_selected': 'Seleccionadas',
+        'mgmt.col_id': 'ID Tarea',
+        'mgmt.col_client': 'Cliente',
+        'mgmt.col_title': 'Título de la Tarea',
+        'mgmt.col_date': 'Fecha de Planificación',
+        'mgmt.col_status': 'Estado',
+        'mgmt.delete_selected_btn': 'Eliminar Seleccionadas ({n})',
+        'mgmt.no_tasks_found': 'No se encontraron tareas con los filtros seleccionados.',
+        'mgmt.invalid_file': 'Archivo inválido o sin IDs de tareas.',
+        'mgmt.delete_confirm': '¿Estás seguro de que deseas eliminar las {n} tareas seleccionadas de forma permanente?',
+        // Mgmt logs
+        'log.mgmt_delete_start': 'Iniciando eliminación masiva de {n} tareas...',
+        'log.mgmt_delete_ok': 'OK: Tarea {id} eliminada.',
+        'log.mgmt_delete_err': 'ERR: No se pudo eliminar la tarea {id}: {msg}',
+        'log.mgmt_delete_complete': 'Eliminación completada. Éxito: {success}, Errores: {failure}.',
+        'progress.delete_title': 'Eliminación de Tareas en Curso...',
+        'progress.delete_success_label': 'Eliminadas con Éxito',
+        'progress.delete_failure_label': 'Errores / Fallidas',
     },
     it: {
         // Page
@@ -349,6 +383,40 @@ const TRANSLATIONS = {
         'loading.type': 'Caricamento {name}...',
         'loading.details_btn': 'Contratti {i}/{n}...',
         'loading.rollback': 'Annullamento...',
+        // Mgmt panel
+        'mgmt.title': 'Gestione ed Eliminazione Incarichi',
+        'mgmt.csv_section': 'Utilità CSV',
+        'mgmt.download_last_btn': 'Scarica CSV Ultima Creazione',
+        'mgmt.upload_csv_label': 'Elimina incarichi da file CSV',
+        'mgmt.upload_csv_btn': 'Carica CSV ed Elimina',
+        'mgmt.csv_hint': 'Carica un file CSV con una colonna ID per eliminare gli incarichi in blocco.',
+        'mgmt.search_section': 'Cerca ed Elimina Incarichi Futuri',
+        'mgmt.task_type_label': 'Tipo di Incarico',
+        'mgmt.task_type_placeholder': 'Seleziona un tipo di incarico...',
+        'mgmt.date_from_label': 'A partire dalla data (inclusa)',
+        'mgmt.only_uncompleted_label': 'Solo incarichi non completati',
+        'mgmt.search_btn': 'Cerca Incarichi Futuri',
+        // Mgmt delete modal
+        'mgmt.delete_title': 'Conferma Eliminazione Incarichi',
+        'mgmt.tasks_found': 'Incarichi Trovati',
+        'mgmt.tasks_selected': 'Selezionati',
+        'mgmt.col_id': 'ID Incarico',
+        'mgmt.col_client': 'Cliente',
+        'mgmt.col_title': 'Titolo Incarico',
+        'mgmt.col_date': 'Data Pianificazione',
+        'mgmt.col_status': 'Stato',
+        'mgmt.delete_selected_btn': 'Elimina Selezionati ({n})',
+        'mgmt.no_tasks_found': 'Nessun incarico trovato con i filtri selezionati.',
+        'mgmt.invalid_file': 'File non valido o privo di ID incarico.',
+        'mgmt.delete_confirm': 'Sei sicuro di voler eliminare permanentemente i {n} incarichi selezionati?',
+        // Mgmt logs
+        'log.mgmt_delete_start': 'Avvio eliminazione massiva di {n} incarichi...',
+        'log.mgmt_delete_ok': 'OK: Incarico {id} eliminato.',
+        'log.mgmt_delete_err': 'ERR: Impossibile eliminare l\'incarico {id}: {msg}',
+        'log.mgmt_delete_complete': 'Eliminazione completata. Successo: {success}, Errori: {failure}.',
+        'progress.delete_title': 'Eliminazione Incarichi in Corso...',
+        'progress.delete_success_label': 'Eliminati con Successo',
+        'progress.delete_failure_label': 'Errori / Falliti',
     }
 };
 
@@ -715,6 +783,9 @@ const App = {
     activeWorkersCount: 0,
     stats: { success: 0, failure: 0, skipped: 0, total: 0, processed: 0 },
     createdTaskIds: [],
+    createdTasksList: [],
+    mgmtTasksToDelete: [],
+    mgmtStatuses: [],
 
     /**
      * 3. Internationalisation helpers
@@ -825,6 +896,7 @@ const App = {
 
         this.programStartDate = this.formatDateIso(new Date());
         document.getElementById('input-start-date').value = this.programStartDate;
+        document.getElementById('input-mgmt-date-from').value = this.programStartDate;
 
         const savedKey = safeStorage.getItem('takeoff_api_key');
         if (savedKey) document.getElementById('api-key-input').value = savedKey;
@@ -866,8 +938,12 @@ const App = {
             badge.querySelector('.status-text').textContent = this.t('status.disconnected');
             document.getElementById('user-profile-card').classList.add('hidden');
             document.getElementById('defaults-panel').classList.add('disabled');
+            document.getElementById('management-panel').classList.add('disabled');
             document.getElementById('generator-panel').classList.add('disabled');
             document.getElementById('btn-load-contacts').disabled = true;
+            document.getElementById('select-mgmt-task-type').value = '';
+            document.getElementById('btn-download-last-csv').classList.add('disabled');
+            document.getElementById('btn-download-last-csv').disabled = true;
         });
 
         document.getElementById('btn-connect').addEventListener('click', () => this.connectApi());
@@ -942,6 +1018,49 @@ const App = {
         });
         document.getElementById('btn-rollback-execution').addEventListener('click', () => this.rollbackExecution());
         document.getElementById('btn-copy-logs').addEventListener('click', () => this.copyConsoleLogs());
+
+        // CSV and Advanced Task Management listeners
+        document.getElementById('btn-download-last-csv').addEventListener('click', () => this.downloadCreatedTasksCsv());
+        document.getElementById('btn-trigger-file-upload').addEventListener('click', () => {
+            document.getElementById('input-delete-csv-file').click();
+        });
+        document.getElementById('input-delete-csv-file').addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                this.handleCsvUpload(e.target.files[0]);
+            }
+        });
+        document.getElementById('select-mgmt-task-type').addEventListener('change', async (e) => {
+            const typeId = e.target.value;
+            this.mgmtStatuses = [];
+            if (!typeId) return;
+            try {
+                const steps = await this.client.getTaskStatuses(typeId);
+                this.mgmtStatuses = steps;
+            } catch (err) {
+                console.error("Error loading statuses for mgmt task type:", err);
+            }
+        });
+        document.getElementById('btn-search-future-tasks').addEventListener('click', () => this.searchFutureTasks());
+        
+        // Advanced delete modal actions
+        document.getElementById('btn-close-mgmt-delete-modal').addEventListener('click', () => {
+            document.getElementById('mgmt-delete-modal').classList.add('hidden');
+        });
+        document.getElementById('btn-cancel-mgmt-delete').addEventListener('click', () => {
+            document.getElementById('mgmt-delete-modal').classList.add('hidden');
+        });
+        document.getElementById('select-all-delete-tasks').addEventListener('change', (e) => {
+            document.querySelectorAll('.chk-delete-task').forEach(chk => {
+                chk.checked = e.target.checked;
+            });
+            this.updateMgmtDeleteConfirmBtn();
+        });
+        document.getElementById('mgmt-delete-table-body').addEventListener('change', (e) => {
+            if (e.target.classList.contains('chk-delete-task')) {
+                this.updateMgmtDeleteConfirmBtn();
+            }
+        });
+        document.getElementById('btn-confirm-mgmt-delete').addEventListener('click', () => this.executeMgmtDelete());
     },
 
     /**
@@ -1021,6 +1140,7 @@ const App = {
             await this.loadLookups();
 
             document.getElementById('defaults-panel').classList.remove('disabled');
+            document.getElementById('management-panel').classList.remove('disabled');
             document.getElementById('btn-load-contacts').disabled = false;
 
             this.log(this.t('log.connected', { name: userProfile.displayName || userProfile.firstName }), 'success');
@@ -1036,6 +1156,7 @@ const App = {
             document.getElementById('user-profile-card').classList.add('hidden');
 
             document.getElementById('defaults-panel').classList.add('disabled');
+            document.getElementById('management-panel').classList.add('disabled');
             document.getElementById('generator-panel').classList.add('disabled');
             document.getElementById('btn-load-contacts').disabled = true;
         } finally {
@@ -1050,11 +1171,21 @@ const App = {
             this.taskTypes = types;
             const selectType = document.getElementById('select-task-type');
             selectType.innerHTML = `<option value="">${this.t('config.task_type_placeholder')}</option>`;
+            const selectMgmtType = document.getElementById('select-mgmt-task-type');
+            if (selectMgmtType) {
+                selectMgmtType.innerHTML = `<option value="">${this.t('mgmt.task_type_placeholder')}</option>`;
+            }
             types.forEach(t => {
                 const opt = document.createElement('option');
                 opt.value = t.id;
                 opt.textContent = t.name;
                 selectType.appendChild(opt);
+                if (selectMgmtType) {
+                    const optMgmt = document.createElement('option');
+                    optMgmt.value = t.id;
+                    optMgmt.textContent = t.name;
+                    selectMgmtType.appendChild(optMgmt);
+                }
             });
             selectType.disabled = false;
 
@@ -1955,6 +2086,9 @@ const App = {
         this.cancelExecution = false;
         this.stats = { success: 0, failure: 0, skipped: 0, total: tasksToCreate.length, processed: 0 };
         this.createdTaskIds = [];
+        this.createdTasksList = [];
+        document.getElementById('btn-download-last-csv').classList.add('disabled');
+        document.getElementById('btn-download-last-csv').disabled = true;
 
         document.getElementById('progress-ratio').textContent       = `0 / ${this.stats.total}`;
         document.getElementById('progress-bar-fill').style.width    = '0%';
@@ -2051,8 +2185,18 @@ const App = {
         this.isExecuting = false;
         document.getElementById('btn-stop-execution').classList.add('hidden');
         document.getElementById('btn-close-progress').classList.remove('hidden');
+        
         if (this.createdTaskIds && this.createdTaskIds.length > 0) {
             document.getElementById('btn-rollback-execution').classList.remove('hidden');
+        }
+
+        if (this.createdTasksList && this.createdTasksList.length > 0) {
+            const btnCsv = document.getElementById('btn-download-last-csv');
+            if (btnCsv) {
+                btnCsv.classList.remove('disabled');
+                btnCsv.disabled = false;
+            }
+            this.downloadCreatedTasksCsv();
         }
 
         if (this.cancelExecution) {
@@ -2130,6 +2274,14 @@ const App = {
                 const createdTask = await this.client.createTask(payload);
                 if (createdTask && createdTask.id) {
                     this.createdTaskIds.push(createdTask.id);
+                    this.createdTasksList.push({
+                        id: createdTask.id,
+                        clientName: task.clientName,
+                        clientCode: task.clientCode || '',
+                        title: task.title,
+                        plannedStart: plannedStartIso,
+                        plannedEnd: plannedEndIso
+                    });
                 }
                 this.stats.success++;
                 this.log(this.t('log.task_ok', { id: task.contactId, client: task.clientName, title: task.title }), 'success');
@@ -2211,6 +2363,393 @@ const App = {
 
     delay(ms) {
         return new Promise(resolve => setTimeout(resolve, ms));
+    },
+
+    downloadCreatedTasksCsv() {
+        const list = this.createdTasksList || [];
+        if (list.length === 0) return;
+
+        let csvContent = "\uFEFF"; // BOM for Excel
+        csvContent += "ID,Codice Cliente,Nome Cliente,Titolo Incarico,Inizio Pianificazione,Fine Pianificazione\r\n";
+        
+        list.forEach(t => {
+            const row = [
+                t.id,
+                `"${(t.clientCode || '').replace(/"/g, '""')}"`,
+                `"${(t.clientName || '').replace(/"/g, '""')}"`,
+                `"${(t.title || '').replace(/"/g, '""')}"`,
+                t.plannedStart || '',
+                t.plannedEnd || ''
+            ].join(",");
+            csvContent += row + "\r\n";
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `incarichi_creati_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+    },
+
+    parseCsv(text) {
+        const lines = text.split(/\r?\n/);
+        if (lines.length === 0) return [];
+
+        const parseRow = (line) => {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result;
+        };
+
+        const headers = parseRow(lines[0]);
+        const normHeaders = headers.map(h => h.toLowerCase().replace(/["'\s_]/g, ''));
+
+        let idIdx = normHeaders.indexOf('id');
+        if (idIdx === -1) idIdx = normHeaders.findIndex(h => h.includes('id'));
+
+        let clientIdx = normHeaders.findIndex(h => h.includes('client') || h.includes('nome') || h.includes('ditta') || h.includes('codice'));
+        let titleIdx = normHeaders.findIndex(h => h.includes('titolo') || h.includes('title') || h.includes('name') || h.includes('desc') || h.includes('incarico'));
+        let dateIdx = normHeaders.findIndex(h => h.includes('inizi') || h.includes('start') || h.includes('date') || h.includes('data') || h.includes('pianificazione'));
+
+        const tasks = [];
+        const useFallback = idIdx === -1;
+        const startRow = useFallback ? 0 : 1;
+
+        for (let i = startRow; i < lines.length; i++) {
+            const line = lines[i].trim();
+            if (!line) continue;
+
+            const parts = parseRow(line);
+            if (parts.length === 0) continue;
+
+            let id = '';
+            let clientName = '';
+            let title = '';
+            let dateVal = '';
+
+            if (useFallback) {
+                id = parts[0].replace(/"/g, '').trim();
+                if (parts[1]) clientName = parts[1].replace(/"/g, '').trim();
+                if (parts[2]) title = parts[2].replace(/"/g, '').trim();
+                if (parts[3]) dateVal = parts[3].replace(/"/g, '').trim();
+            } else {
+                id = parts[idIdx] ? parts[idIdx].replace(/"/g, '').trim() : '';
+                clientName = clientIdx !== -1 && parts[clientIdx] ? parts[clientIdx].replace(/"/g, '').trim() : '';
+                title = titleIdx !== -1 && parts[titleIdx] ? parts[titleIdx].replace(/"/g, '').trim() : '';
+                dateVal = dateIdx !== -1 && parts[dateIdx] ? parts[dateIdx].replace(/"/g, '').trim() : '';
+            }
+
+            if (id && !isNaN(id)) {
+                tasks.push({
+                    id: parseInt(id),
+                    clientName: clientName || 'N/D',
+                    title: title || 'N/D',
+                    plannedStart: dateVal || 'N/D',
+                    statusName: 'CSV Upload'
+                });
+            }
+        }
+
+        return tasks;
+    },
+
+    handleCsvUpload(file) {
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const text = e.target.result;
+            const parsedRows = this.parseCsv(text);
+            if (parsedRows.length === 0) {
+                alert(this.t('mgmt.invalid_file'));
+                return;
+            }
+            this.showMgmtDeleteModal(parsedRows, 'csv');
+        };
+        reader.readAsText(file);
+        // Clear input value so same file can be reloaded
+        document.getElementById('input-delete-csv-file').value = '';
+    },
+
+    async searchFutureTasks() {
+        const taskTypeId = document.getElementById('select-mgmt-task-type').value;
+        if (!taskTypeId) {
+            alert(this.t('alert.select_type_status'));
+            return;
+        }
+
+        const btn = document.getElementById('btn-search-future-tasks');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> <span>${this.t('loading.loading')}</span>`;
+
+        try {
+            // Load statuses for this type if not loaded already
+            if (!this.mgmtStatuses || this.mgmtStatuses.length === 0) {
+                try {
+                    this.mgmtStatuses = await this.client.getTaskStatuses(taskTypeId);
+                } catch (e) {
+                    console.warn("Could not load task type statuses:", e);
+                }
+            }
+
+            // Fetch tasks. Query up to 400 tasks of this type (two pages)
+            let allTasks = [];
+            for (let skip = 0; skip < 400; skip += 200) {
+                const response = await this.client.request('/api/tasks/search', {
+                    method: 'POST',
+                    headers: this.client.getHeaders(),
+                    body: JSON.stringify({
+                        taskTypeIds: [parseInt(taskTypeId)],
+                        skip: skip,
+                        take: 200
+                    })
+                });
+                if (!response.ok) break;
+                const data = await response.json();
+                const val = data.value !== undefined ? data.value : data;
+                const tasks = val.data !== undefined ? val.data : (Array.isArray(val) ? val : []);
+                allTasks = allTasks.concat(tasks);
+                if (tasks.length < 200) break;
+            }
+
+            const dateFromInput = document.getElementById('input-mgmt-date-from').value;
+            const targetDate = dateFromInput ? new Date(dateFromInput + 'T00:00:00') : new Date();
+            const onlyUncompleted = document.getElementById('input-mgmt-only-uncompleted').checked;
+
+            const filtered = allTasks.filter(t => {
+                if (!t.plannedStart) return false;
+                const ps = new Date(t.plannedStart);
+                if (ps < targetDate) return false;
+
+                if (onlyUncompleted && this.isTaskCompleted(t)) {
+                    return false;
+                }
+                return true;
+            });
+
+            if (filtered.length === 0) {
+                alert(this.t('mgmt.no_tasks_found'));
+                return;
+            }
+
+            const mappedTasks = filtered.map(t => {
+                let clientName = 'N/D';
+                if (t.contact) {
+                    clientName = t.contact.displayName || t.contact.name || `${t.contact.firstName || ''} ${t.contact.lastName || ''}`.trim() || 'N/D';
+                } else if (t.contactId) {
+                    const matchedContact = this.contactsData.find(c => c.contactId === t.contactId);
+                    if (matchedContact) {
+                        clientName = matchedContact.clientName || matchedContact.displayName || 'N/D';
+                    } else {
+                        clientName = `ID Contatto: ${t.contactId}`;
+                    }
+                }
+
+                let statusName = 'N/D';
+                if (t.statusId && this.mgmtStatuses) {
+                    const matchedStep = this.mgmtStatuses.find(s => s.id === t.statusId);
+                    if (matchedStep) statusName = matchedStep.name;
+                }
+
+                return {
+                    id: t.id,
+                    clientName,
+                    title: t.name || 'N/D',
+                    plannedStart: t.plannedStart || '',
+                    statusName,
+                    isCompleted: this.isTaskCompleted(t)
+                };
+            });
+
+            this.showMgmtDeleteModal(mappedTasks, 'search');
+
+        } catch (error) {
+            console.error(error);
+            alert(`Error: ${error.message}`);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    },
+
+    isTaskCompleted(t) {
+        if (t.isCompleted !== undefined) return !!t.isCompleted;
+        if (t.completed !== undefined) return !!t.completed;
+        if (t.isClosed !== undefined) return !!t.isClosed;
+        if (t.closed !== undefined) return !!t.closed;
+        if (t.state === 2) return true; // closed state
+        
+        if (t.statusId && this.mgmtStatuses) {
+            const step = this.mgmtStatuses.find(s => s.id === t.statusId);
+            if (step) {
+                const name = step.name.toLowerCase();
+                return name.includes('complet') || name.includes('chius') || name.includes('cerr') || name.includes('fin') || name.includes('termin');
+            }
+        }
+        return false;
+    },
+
+    showMgmtDeleteModal(tasks, source) {
+        this.mgmtTasksToDelete = tasks;
+        const tableBody = document.getElementById('mgmt-delete-table-body');
+        tableBody.innerHTML = '';
+
+        document.getElementById('stats-delete-total').textContent = tasks.length;
+        document.getElementById('stats-delete-selected').textContent = tasks.length;
+        document.getElementById('select-all-delete-tasks').checked = true;
+
+        const formatDatePart = (dateStr) => {
+            if (!dateStr || typeof dateStr !== 'string') return 'N/D';
+            return dateStr.substring(0, 10);
+        };
+
+        tasks.forEach((t, idx) => {
+            const row = document.createElement('tr');
+            const completed = t.isCompleted || (source !== 'csv' && this.isTaskCompleted(t));
+            const statusClass = completed ? 'badge-connected' : 'badge-disconnected';
+            row.innerHTML = `
+                <td class="col-select" style="padding: 12px 8px;"><input type="checkbox" class="chk-delete-task" data-idx="${idx}" checked></td>
+                <td style="padding: 12px 8px; font-weight: 500;">${t.id}</td>
+                <td class="col-client">${this.escapeHtml(t.clientName)}</td>
+                <td class="col-title">${this.escapeHtml(t.title)}</td>
+                <td class="col-date">${this.escapeHtml(formatDatePart(t.plannedStart))}</td>
+                <td class="col-badge"><span class="badge ${statusClass}">${this.escapeHtml(t.statusName || 'N/D')}</span></td>
+            `;
+            tableBody.appendChild(row);
+        });
+
+        const titleEl = document.getElementById('mgmt-delete-modal-title');
+        if (source === 'csv') {
+            titleEl.textContent = this.lang === 'it' ? 'Eliminazione da File CSV' : 'Eliminación desde Archivo CSV';
+        } else {
+            titleEl.textContent = this.lang === 'it' ? 'Eliminazione Incarichi Futuri' : 'Eliminación de Tareas Futuras';
+        }
+
+        this.updateMgmtDeleteConfirmBtn();
+        document.getElementById('mgmt-delete-modal').classList.remove('hidden');
+    },
+
+    updateMgmtDeleteConfirmBtn() {
+        const checkboxes = document.querySelectorAll('.chk-delete-task:checked');
+        const count = checkboxes.length;
+        const btn = document.getElementById('btn-confirm-mgmt-delete');
+        btn.querySelector('.btn-text').textContent = this.t('mgmt.delete_selected_btn', { n: count });
+        btn.disabled = count === 0;
+        document.getElementById('stats-delete-selected').textContent = count;
+    },
+
+    async executeMgmtDelete() {
+        const checkboxes = document.querySelectorAll('.chk-delete-task:checked');
+        const tasksToDelete = [];
+        checkboxes.forEach(chk => {
+            const idx = parseInt(chk.dataset.idx);
+            if (this.mgmtTasksToDelete[idx]) {
+                tasksToDelete.push(this.mgmtTasksToDelete[idx]);
+            }
+        });
+
+        const count = tasksToDelete.length;
+        if (count === 0) return;
+
+        const confirmMsg = this.t('mgmt.delete_confirm', { n: count });
+        if (!confirm(confirmMsg)) return;
+
+        document.getElementById('mgmt-delete-modal').classList.add('hidden');
+
+        // Set up progress modal for deletion
+        this.isExecuting = true;
+        this.cancelExecution = false;
+        this.stats = { success: 0, failure: 0, skipped: 0, total: count, processed: 0 };
+        this.createdTaskIds = []; // reset rollback list
+
+        // Show progress modal
+        const progressModal = document.getElementById('progress-modal');
+        progressModal.classList.remove('hidden');
+
+        // Change title and labels dynamically
+        const progressTitle = progressModal.querySelector('h3');
+        const originalTitle = progressTitle.textContent;
+        const originalTitleKey = progressTitle.dataset.i18n;
+        progressTitle.textContent = this.t('progress.delete_title');
+        progressTitle.dataset.i18n = 'progress.delete_title';
+
+        const successLabel = progressModal.querySelector('.stat-box.success .stat-label');
+        const originalSuccessLabel = successLabel.textContent;
+        const originalSuccessLabelKey = successLabel.dataset.i18n;
+        successLabel.textContent = this.t('progress.delete_success_label');
+        successLabel.dataset.i18n = 'progress.delete_success_label';
+
+        const failureLabel = progressModal.querySelector('.stat-box.failure .stat-label');
+        const originalFailureLabel = failureLabel.textContent;
+        const originalFailureLabelKey = failureLabel.dataset.i18n;
+        failureLabel.textContent = this.t('progress.delete_failure_label');
+        failureLabel.dataset.i18n = 'progress.delete_failure_label';
+
+        const skipBox = progressModal.querySelector('.stat-box.skipped');
+        if (skipBox) skipBox.classList.add('hidden');
+
+        document.getElementById('progress-ratio').textContent = `0 / ${count}`;
+        document.getElementById('progress-bar-fill').style.width = '0%';
+        document.getElementById('stats-success-count').textContent = '0';
+        document.getElementById('stats-failure-count').textContent = '0';
+        document.getElementById('stats-percent').textContent = '0%';
+        document.getElementById('btn-stop-execution').classList.remove('hidden');
+        document.getElementById('btn-rollback-execution').classList.add('hidden');
+        document.getElementById('btn-close-progress').classList.add('hidden');
+
+        this.clearConsole();
+        this.log(this.t('log.mgmt_delete_start', { n: count }), 'info');
+
+        // Perform deletion sequentially
+        for (const task of tasksToDelete) {
+            if (this.cancelExecution) break;
+            try {
+                await this.client.deleteTask(task.id);
+                this.stats.success++;
+                this.log(this.t('log.mgmt_delete_ok', { id: task.id }), 'success');
+            } catch (err) {
+                this.stats.failure++;
+                this.log(this.t('log.mgmt_delete_err', { id: task.id, msg: err.message }), 'error');
+            }
+            this.stats.processed++;
+            this.updateProgressUi();
+            await this.delay(120);
+        }
+
+        this.isExecuting = false;
+        document.getElementById('btn-stop-execution').classList.add('hidden');
+        document.getElementById('btn-close-progress').classList.remove('hidden');
+
+        this.log(this.t('log.mgmt_delete_complete', { success: this.stats.success, failure: this.stats.failure }), 'info');
+
+        const restoreLabels = () => {
+            progressTitle.textContent = this.t(originalTitleKey || 'progress.title');
+            progressTitle.dataset.i18n = originalTitleKey || 'progress.title';
+            successLabel.textContent = this.t(originalSuccessLabelKey || 'progress.success_label');
+            successLabel.dataset.i18n = originalSuccessLabelKey || 'progress.success_label';
+            failureLabel.textContent = this.t(originalFailureLabelKey || 'progress.failure_label');
+            failureLabel.dataset.i18n = originalFailureLabelKey || 'progress.failure_label';
+            if (skipBox) skipBox.classList.remove('hidden');
+            document.getElementById('btn-close-progress').removeEventListener('click', restoreLabels);
+        };
+        document.getElementById('btn-close-progress').addEventListener('click', restoreLabels);
     }
 };
 

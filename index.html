@@ -173,8 +173,72 @@
                             <div class="form-group">
                                 <label for="template-description" data-i18n="config.template_desc_label">Plantilla Descripción Tarea</label>
                                 <textarea id="template-description" rows="3">Realizar el mantenimiento programado periódico del cliente &lt;br&gt;{cliente}.&lt;br&gt;&#10;&lt;br&gt;&#10;Recurrencia programada: {recurrencia}&lt;br&gt;&#10;Fecha inicio ciclo de mantenimiento: {fecha_activacion}</textarea>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- PANEL 5: TASK MANAGEMENT & DELETION -->
+                <section class="glass-panel disabled" id="management-panel" style="margin-top: 24px;">
+                    <div class="panel-header">
+                        <div class="panel-title-icon"><i class="fa-solid fa-toolbox"></i></div>
+                        <h2 data-i18n="mgmt.title">Gestión y Eliminación de Tareas</h2>
+                    </div>
+                    <div class="panel-body">
+                        <!-- Sub-section 1: CSV Utilities -->
+                        <div class="mgmt-section-header">
+                            <h4 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-file-csv" style="color: var(--accent);"></i>
+                                <span data-i18n="mgmt.csv_section">Utilidades CSV</span>
+                            </h4>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <button type="button" id="btn-download-last-csv" class="btn btn-secondary btn-full disabled" disabled>
+                                <span class="btn-text" data-i18n="mgmt.download_last_btn">Descargar CSV Última Ejecución</span>
+                                <span class="btn-icon-right"><i class="fa-solid fa-download"></i></span>
+                            </button>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 20px;">
+                            <label data-i18n="mgmt.upload_csv_label" style="font-size: 0.85rem; font-weight: 500; display: block; margin-bottom: 8px;">Eliminar tareas desde archivo CSV</label>
+                            <input type="file" id="input-delete-csv-file" accept=".csv,.txt" style="display:none;">
+                            <button type="button" id="btn-trigger-file-upload" class="btn btn-warning btn-full">
+                                <span class="btn-text" data-i18n="mgmt.upload_csv_btn">Carica CSV ed Elimina</span>
+                                <span class="btn-icon-right"><i class="fa-solid fa-trash-can"></i></span>
+                            </button>
+                            <p class="field-hint" data-i18n="mgmt.csv_hint" style="margin-top: 6px;">Sube un archivo CSV con una columna ID para eliminar tareas en lote.</p>
+                        </div>
+
+                        <hr class="panel-divider">
+
+                        <!-- Sub-section 2: Future Tasks Deletion -->
+                        <div class="mgmt-section-header" style="margin-top: 20px;">
+                            <h4 style="display: flex; align-items: center; gap: 8px;">
+                                <i class="fa-solid fa-magnifying-glass-minus" style="color: var(--accent);"></i>
+                                <span data-i18n="mgmt.search_section">Buscar y Eliminar Tareas Futuras</span>
+                            </h4>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label for="select-mgmt-task-type" data-i18n="mgmt.task_type_label">Tipo de Tarea</label>
+                            <select id="select-mgmt-task-type">
+                                <option value="" data-i18n="mgmt.task_type_placeholder">Selecciona un tipo...</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin-bottom: 12px;">
+                            <label for="input-mgmt-date-from" data-i18n="mgmt.date_from_label">A partir de la fecha (inclusive)</label>
+                            <input type="date" id="input-mgmt-date-from">
+                        </div>
+                        <div class="form-group" style="margin-bottom: 16px;">
+                            <div class="checkbox-wrapper">
+                                <label class="switch">
+                                    <input type="checkbox" id="input-mgmt-only-uncompleted" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                                <span class="switch-label" data-i18n="mgmt.only_uncompleted_label">Solo no completadas</span>
                             </div>
                         </div>
+                        <button type="button" id="btn-search-future-tasks" class="btn btn-accent btn-full">
+                            <span class="btn-text" data-i18n="mgmt.search_btn">Buscar Tareas Futuras</span>
+                            <span class="btn-icon-right"><i class="fa-solid fa-magnifying-glass"></i></span>
+                        </button>
                     </div>
                 </section>
             </div>
@@ -442,6 +506,48 @@
             <div class="modal-footer">
                 <button type="button" id="btn-cancel-edit" class="btn btn-secondary" data-i18n="edit.cancel">Cancelar</button>
                 <button type="button" id="btn-save-edit" class="btn btn-accent" data-i18n="edit.save">Guardar Cambios</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ADVANCED DELETE MODAL (FOR CSV & FUTURE SEARCH) -->
+    <div class="modal-overlay hidden" id="mgmt-delete-modal">
+        <div class="modal-container glass-panel" style="max-width: 850px; width: 90%;">
+            <div class="modal-header">
+                <h3 id="mgmt-delete-modal-title" data-i18n="mgmt.delete_title">Confirmar Eliminación de Tareas</h3>
+                <button type="button" id="btn-close-mgmt-delete-modal" class="btn-icon-close"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="preview-toolbar" style="margin-bottom: 16px; display: flex; justify-content: flex-end;">
+                    <div class="toolbar-stats" style="margin-left: 0;">
+                        <span class="stat-badge"><strong id="stats-delete-total">0</strong> <span data-i18n="mgmt.tasks_found">Tareas Encontradas</span></span>
+                        <span class="stat-badge success"><strong id="stats-delete-selected">0</strong> <span data-i18n="mgmt.tasks_selected">Seleccionadas</span></span>
+                    </div>
+                </div>
+                <div class="table-container scrollable-y" style="max-height: 350px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: var(--border-radius-sm); background: rgba(0,0,0,0.2);">
+                    <table class="preview-table">
+                        <thead>
+                            <tr>
+                                <th class="col-select" style="padding: 12px 8px;"><input type="checkbox" id="select-all-delete-tasks" checked></th>
+                                <th style="width: 100px; text-align: left; padding: 12px 8px;">ID</th>
+                                <th class="col-client" data-i18n="mgmt.col_client">Cliente</th>
+                                <th class="col-title" data-i18n="mgmt.col_title">Título de la Tarea</th>
+                                <th class="col-date" data-i18n="mgmt.col_date">Fecha de Planificación</th>
+                                <th class="col-badge" data-i18n="mgmt.col_status">Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody id="mgmt-delete-table-body">
+                            <!-- Dynamic rows -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btn-cancel-mgmt-delete" class="btn btn-secondary" data-i18n="edit.cancel">Cancelar</button>
+                <button type="button" id="btn-confirm-mgmt-delete" class="btn btn-danger">
+                    <span class="btn-text">Eliminar Seleccionadas (0)</span>
+                    <span class="btn-icon-right"><i class="fa-solid fa-trash-can"></i></span>
+                </button>
             </div>
         </div>
     </div>

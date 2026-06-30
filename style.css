@@ -1699,3 +1699,23 @@ input:checked + .slider:before {
 .preview-table tr.row-warning-contact:hover {
     background-color: rgba(255, 178, 54, 0.05);
 }
+
+/* Panel divider line */
+.panel-divider {
+    border: 0;
+    border-top: 1px solid var(--border-color);
+    margin: 20px 0;
+}
+
+/* Management panel section styling */
+.mgmt-section-header {
+    margin-bottom: 14px;
+}
+
+.mgmt-section-header h4 {
+    font-family: var(--font-heading);
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0 0 8px 0;
+    color: var(--text-color);
+}
