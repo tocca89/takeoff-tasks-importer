@@ -89,6 +89,8 @@ const TRANSLATIONS = {
         'generator.check_existing_hint': 'Más lento pero evita duplicados si algunos contactos ya fueron procesados.',
         'generator.calendar_month_label': 'Período de referencia: mes solar',
         'generator.calendar_month_hint': 'Si está activo, la planificación y la fecha de activación se alinearán con el primer y el último día del mes solar (ej. del 01 al 30/31).',
+        'generator.include_past_label': 'Permitir la creación de tareas pasadas',
+        'generator.include_past_hint': 'Si está activado, también se generarán las tareas correspondientes a ciclos anteriores a la fecha actual.',
         // Progress modal
         'progress.title': 'Creación de Tareas en Curso...',
         'progress.success_label': 'Creadas con Éxito',
@@ -295,6 +297,8 @@ const TRANSLATIONS = {
         'generator.check_existing_hint': 'Più lento ma evita duplicati se alcuni contatti sono già stati elaborati.',
         'generator.calendar_month_label': 'Periodo di riferimento: mese solare',
         'generator.calendar_month_hint': 'Se attivo, la pianificazione e la data di attivazione si allineeranno sempre al primo e all\'ultimo giorno del mese solare (es. dal 01 al 30/31).',
+        'generator.include_past_label': 'Consenti la creazione di incarichi passati',
+        'generator.include_past_hint': 'Se attivo, verranno generati anche gli incarichi relativi a cicli precedenti alla data attuale.',
         // Progress modal
         'progress.title': 'Creazione Incarichi in Corso...',
         'progress.success_label': 'Creati con Successo',
@@ -1004,6 +1008,9 @@ const App = {
         document.getElementById('btn-generate-schedule').addEventListener('click', () => this.generateSchedule());
         document.getElementById('preview-search').addEventListener('input', (e) => this.filterPreview(e.target.value));
         document.getElementById('select-all-tasks').addEventListener('change', (e) => this.toggleSelectAll(e.target.checked));
+        ['input-start-date', 'input-duration-months', 'input-activation-offset', 'input-calendar-month', 'input-include-past'].forEach(id => {
+            document.getElementById(id)?.addEventListener('change', () => this._resetScheduleIfGenerated());
+        });
 
         // Edit modal
         document.getElementById('btn-close-edit-modal').addEventListener('click', () => this.closeEditModal());
@@ -1738,6 +1745,7 @@ const App = {
 
         const offsetDaysInput = parseInt(document.getElementById('input-activation-offset').value) || 0;
         const useCalendarMonth = !!document.getElementById('input-calendar-month')?.checked;
+        const includePast      = !!document.getElementById('input-include-past')?.checked;
 
         const btn = document.getElementById('btn-generate-schedule');
         const originalHtml = btn.innerHTML;
@@ -1755,11 +1763,19 @@ const App = {
             const localeLang    = this.lang === 'it' ? 'it-IT' : 'es-ES';
             let fallbackCount   = 0;
 
-            // Never recreate past maintenances: only cycles whose activation is
-            // today or later are generated, within a window of `durationMonths`
-            // from today. The contract date still anchors the cadence/day-of-month.
             const today     = new Date(); today.setHours(0, 0, 0, 0);
-            const windowEnd = this.addMonths(today, this.durationMonths);
+            const refDate   = (fallbackStart > today) ? fallbackStart : today;
+            const windowEnd = this.addMonths(refDate, this.durationMonths);
+
+            // Determine lower cutoff for cycle dates
+            let minDate;
+            if (!includePast) {
+                minDate = today;
+            } else if (fallbackStart < today) {
+                minDate = fallbackStart;
+            } else {
+                minDate = null;
+            }
 
             this.contactsData.forEach(contact => {
                 // Skip types that have been unchecked in the breakdown filter
@@ -1788,12 +1804,12 @@ const App = {
                 const recLabel = this.t('rec.' + recurrenceCode);
 
                 // Walk the cadence anchored on the contract date, skipping past
-                // cycles and stopping at the end of the from-today window.
+                // cycles if includePast is false, and stopping at windowEnd.
                 for (let i = 0; ; i += monthsFrequency) {
                     const cycleStartDate = this.addMonths(baseStartDate, i);
                     if (cycleStartDate >= windowEnd) break;   // past the window
                     if (i > 12 * 300) break;                      // safety net
-                    if (cycleStartDate < today) continue;      // never recreate past cycles
+                    if (minDate && cycleStartDate < minDate) continue;
 
                     // Planning period = the full maintenance cycle: from the
                     // activation date to the day before the next cycle starts.
