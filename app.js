@@ -45,8 +45,8 @@ const TRANSLATIONS = {
         'config.template_title_label': 'Plantilla Título Tarea',
         'config.template_title_vars': 'Variables disponibles:',
         'config.template_desc_label': 'Plantilla Descripción Tarea',
-        'config.default_title': 'Mantenimiento periódico - {cliente}',
-        'config.default_desc': 'Realizar el mantenimiento programado periódico del cliente <br>{cliente}.<br>\n<br>\nRecurrencia programada: {recurrencia}<br>\nFecha inicio ciclo de mantenimiento: {fecha_activacion}',
+        'config.default_title': 'Mantenimiento {periodo} - {cliente}',
+        'config.default_desc': 'Realizar el mantenimiento programado {periodo} del cliente <br>{cliente}.<br>\n<br>\nRecurrencia programada: {recurrencia}<br>\nFecha inicio ciclo de mantenimiento: {fecha_activacion}',
         // Contacts panel
         'contacts.title': 'Clientes con Mantenimiento',
         'contacts.hint': 'Carga los contactos TakeOff que tienen un tipo en el grupo <strong>MANTENIMIENTO</strong> (Mensual, Bimestral, Trimestral, Cuadrimestral, Semestral, Anual).',
@@ -260,8 +260,8 @@ const TRANSLATIONS = {
         'config.template_title_label': 'Modello Titolo Incarico',
         'config.template_title_vars': 'Variabili disponibili:',
         'config.template_desc_label': 'Modello Descrizione Incarico',
-        'config.default_title': 'Manutenzione periodica - {cliente}',
-        'config.default_desc': 'Eseguire la manutenzione programmata periodica del cliente <br>{cliente}.<br>\n<br>\nRicorrenza programmata: {recurrencia}<br>\nData inizio ciclo di manutenzione: {fecha_activacion}',
+        'config.default_title': 'Manutenzione {periodo} - {cliente}',
+        'config.default_desc': 'Eseguire la manutenzione programmata {periodo} del cliente <br>{cliente}.<br>\n<br>\nRicorrenza programmata: {recurrencia}<br>\nData inizio ciclo di manutenzione: {fecha_activacion}',
         // Contacts panel
         'contacts.title': 'Clienti con Manutenzione',
         'contacts.hint': 'Carica i contatti TakeOff che hanno un tipo nel gruppo <strong>MANUTENZIONE</strong> (Mensile, Bimestrale, Trimestrale, Quadrimestrale, Semestrale, Annuale).',
@@ -2006,6 +2006,8 @@ const App = {
                         '{cliente}':          clientName,
                         '{codigo}':           contactId,
                         '{recurrencia}':      recLabel,
+                        '{periodo}':          recLabel.toLowerCase(),
+                        '{periodo_cap}':      recLabel,
                         '{fecha_activacion}': actualActivationDate.toLocaleDateString(localeLang)
                     };
 

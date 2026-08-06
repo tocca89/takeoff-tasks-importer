@@ -167,12 +167,12 @@
                         <div class="expandable-content hidden" id="templates-content">
                             <div class="form-group">
                                 <label for="template-title" data-i18n="config.template_title_label">Plantilla Título Tarea</label>
-                                <input type="text" id="template-title" value="Mantenimiento periódico - {cliente}">
-                                <p class="field-hint"><span data-i18n="config.template_title_vars">Variables disponibles:</span> <code>{cliente}</code>, <code>{codigo}</code>, <code>{recurrencia}</code>, <code>{fecha_activacion}</code></p>
+                                <input type="text" id="template-title" value="Mantenimiento {periodo} - {cliente}">
+                                <p class="field-hint"><span data-i18n="config.template_title_vars">Variables disponibles:</span> <code>{cliente}</code>, <code>{codigo}</code>, <code>{periodo}</code>, <code>{recurrencia}</code>, <code>{fecha_activacion}</code></p>
                             </div>
                             <div class="form-group">
                                 <label for="template-description" data-i18n="config.template_desc_label">Plantilla Descripción Tarea</label>
-                                <textarea id="template-description" rows="3">Realizar el mantenimiento programado periódico del cliente &lt;br&gt;{cliente}.&lt;br&gt;&#10;&lt;br&gt;&#10;Recurrencia programada: {recurrencia}&lt;br&gt;&#10;Fecha inicio ciclo de mantenimiento: {fecha_activacion}</textarea>
+                                <textarea id="template-description" rows="3">Realizar el mantenimiento programado {periodo} del cliente &lt;br&gt;{cliente}.&lt;br&gt;&#10;&lt;br&gt;&#10;Recurrencia programada: {recurrencia}&lt;br&gt;&#10;Fecha inicio ciclo de mantenimiento: {fecha_activacion}</textarea>
                         </div>
                     </div>
                 </section>
