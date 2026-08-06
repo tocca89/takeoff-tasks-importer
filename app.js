@@ -76,6 +76,7 @@ const TRANSLATIONS = {
         'generator.selected_tasks': 'Seleccionadas',
         'generator.col_client': 'Código y Cliente',
         'generator.col_freq': 'Frec.',
+        'generator.col_contract_date': 'Fecha Contrato Mantenimiento',
         'generator.col_activation': 'Fecha de Activación',
         'generator.col_range': 'Planificación (Fin de Ciclo)',
         'generator.col_title': 'Título de la Tarea',
@@ -285,6 +286,7 @@ const TRANSLATIONS = {
         'generator.selected_tasks': 'Selezionati',
         'generator.col_client': 'Codice e Cliente',
         'generator.col_freq': 'Freq.',
+        'generator.col_contract_date': 'Data Contratto Manutenzione',
         'generator.col_activation': 'Data di Attivazione',
         'generator.col_range': 'Pianificazione (Fine Ciclo)',
         'generator.col_title': 'Titolo Incarico',
@@ -1989,6 +1991,7 @@ const App = {
                         jobId,
                         recurrence: recurrenceCode,
                         recurrenceLabel: recLabel,
+                        contractStartDate: contact.contractStartDate,
                         startValidityDate: new Date(actualActivationDate),
                         plannedStart,
                         plannedEnd,
@@ -2071,7 +2074,7 @@ const App = {
         tbody.innerHTML = '';
 
         if (this.filteredTasks.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted);">${this.t('generator.no_results')}</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:24px;color:var(--text-muted);">${this.t('generator.no_results')}</td></tr>`;
             return;
         }
 
@@ -2079,6 +2082,10 @@ const App = {
             const tr = document.createElement('tr');
             tr.id = `task-row-${task.index}`;
             if (!task.selected) tr.className = 'row-excluded';
+
+            const contractDateDisplay = task.contractStartDate
+                ? this.formatDateLabel(task.contractStartDate)
+                : `<span class="fallback-badge" title="${this.t('preview.fallback_badge_title')}"><i class="fa-solid fa-triangle-exclamation"></i> fallback</span>`;
 
             tr.innerHTML = `
                 <td class="col-select">
@@ -2091,6 +2098,7 @@ const App = {
                 <td class="col-badge">
                     <span class="freq-badge freq-${task.recurrence}">${task.recurrence}</span>
                 </td>
+                <td class="col-contract-date">${contractDateDisplay}</td>
                 <td class="col-date">${this.formatDateLabel(task.startValidityDate)}${task.usedFallbackDate ? ` <span class="fallback-badge" title="${this.t('preview.fallback_badge_title')}"><i class="fa-solid fa-triangle-exclamation"></i></span>` : ''}</td>
                 <td class="col-range">${this.formatDateLabel(task.plannedStart)} – ${this.formatDateLabel(task.plannedEnd)}</td>
                 <td class="col-title">${this.escapeHtml(task.title)}</td>

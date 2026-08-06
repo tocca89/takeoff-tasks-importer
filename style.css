@@ -1392,6 +1392,7 @@ input:checked + .slider:before {
 .col-client { font-weight: 600; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
 .col-client span { font-weight: 400; color: var(--text-muted); display: block; font-size: 0.75rem; margin-top: 1px; overflow-wrap: break-word; word-break: break-word; }
 .col-badge { width: 50px; }
+.col-contract-date { font-family: monospace; font-size: 0.83rem; color: var(--text-muted); white-space: nowrap; }
 .col-date { font-family: monospace; font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; }
 .col-range { font-family: monospace; font-size: 0.8rem; color: var(--text-muted); white-space: nowrap; }
 .col-title { font-weight: 500; overflow-wrap: break-word; word-break: break-word; min-width: 0; }
