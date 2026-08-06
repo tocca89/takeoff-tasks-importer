@@ -153,6 +153,7 @@ const TRANSLATIONS = {
         'log.contract_diag': 'Diagnóstico: no se encontró "Fecha Contrato Mantenimiento". Campos del contacto: {keys}. customProperties: {cp}',
         'log.schedule_fallback': 'AVISO: {n} tareas generadas con la fecha fallback (contactos sin fecha de contrato).',
         'preview.fallback_badge_title': 'Sin fecha de contrato — usando la fecha de inicio fallback',
+        'preview.contract_date': 'Fecha de contrato de mantenimiento',
         'log.check_existing_active': 'Verificación de duplicados activa — cada tarea se comprobará antes de crearse.',
         'log.bulk_start': 'Iniciando creación masiva de {n} tareas...',
         'log.project_creating': 'Creando proyecto "{name}" para {n} contactos...',
@@ -361,6 +362,7 @@ const TRANSLATIONS = {
         'log.contract_diag': 'Diagnostica: data inizio manutenzione non trovata. Campi del contatto: {keys}. customProperties: {cp}',
         'log.schedule_fallback': 'AVVISO: {n} incarichi generati con la data fallback (contatti senza data di contratto).',
         'preview.fallback_badge_title': 'Nessuna data di contratto — usata la data di inizio fallback',
+        'preview.contract_date': 'Data di contratto di manutenzione',
         'log.check_existing_active': 'Verifica duplicati attiva — ogni incarico verrà controllato prima della creazione.',
         'log.bulk_start': 'Avvio creazione massiva di {n} incarichi...',
         'log.project_creating': 'Creazione progetto "{name}" per {n} contatti...',
@@ -773,7 +775,21 @@ const App = {
     // Names of the contact custom property that holds the maintenance start
     // date. Matched case-insensitively; the first one found on the contact
     // wins. Add aliases here if the field is named differently in TakeOff.
-    contractDatePropNames: ['Fecha Contrato Mantenimiento', 'Data inizio manutenzione'],
+    contractDatePropNames: [
+        'Fecha Contrato Mantenimiento',
+        'Fecha de Contrato Mantenimiento',
+        'Fecha Contrato de Mantenimiento',
+        'Fecha Contrato',
+        'Fecha de Contrato',
+        'Fecha Inicio Contrato',
+        'Fecha de Inicio Contrato',
+        'Fecha de Inicio Contrato Mantenimiento',
+        'Fecha Inicio Contrato Mantenimiento',
+        'Data inizio manutenzione',
+        'Data contratto manutenzione',
+        'Data inizio contratto',
+        'Data Contratto'
+    ],
 
     // Generator & Preview State
     programStartDate: '',
@@ -1468,7 +1484,13 @@ const App = {
         if (visible.length === 0) {
             container.innerHTML = `<p style="text-align:center;padding:12px;color:var(--text-muted);font-size:0.82rem;">${this.t('contacts.list_empty')}</p>`;
         } else {
-            container.innerHTML = visible.map(c => `
+            container.innerHTML = visible.map(c => {
+                const dateStr = c.contractStartDate ? this.formatDateLabel(c.contractStartDate) : null;
+                const dateBadge = dateStr
+                    ? `<span style="font-size:0.72rem;color:var(--text-muted);margin-left:8px;" title="${this.t('preview.contract_date')}">📅 ${dateStr}</span>`
+                    : `<span style="font-size:0.72rem;color:#e67e22;margin-left:8px;" title="${this.t('preview.fallback_badge_title')}">⚠️ (fallback)</span>`;
+
+                return `
                 <div class="contact-list-row">
                     <label class="type-filter-label contact-list-label">
                         <input type="checkbox" class="type-filter-cb contact-filter-cb"
@@ -1476,10 +1498,12 @@ const App = {
                             ${c.enabled !== false ? 'checked' : ''}>
                         <span class="contact-list-name">${this.escapeHtml(c.clientName)}</span>
                         <span style="font-size:0.7rem;color:var(--text-muted);margin-left:4px;">ID: ${this.escapeHtml(c.contactId)}</span>
+                        ${dateBadge}
                     </label>
                     <span class="freq-badge freq-${c.recurrenceCode}" style="font-size:0.68rem;padding:2px 7px;flex-shrink:0;">${c.recurrenceCode}</span>
                 </div>
-            `).join('');
+            `;
+            }).join('');
 
             container.querySelectorAll('.contact-filter-cb').forEach(cb => {
                 cb.addEventListener('change', (e) => {
@@ -1527,82 +1551,194 @@ const App = {
     // Pulls a named custom property out of a contact object, tolerant of the
     // many shapes a CRM might return (array of {name,value}, dict keyed by
     // name, alternate key names). Returns the raw value or null.
+    /* ── Custom-property extraction (maintenance contract date) ─────────── */
+
+    // Pulls a named custom property out of a contact object, tolerant of the
+    // many shapes a CRM might return (array of {name,value}, dict keyed by
+    // name/id, nested definitions, alternate key names, unicode spaces, etc.).
+    // Returns the raw value or null.
     extractCustomProperty(contact, propName) {
         if (!contact || !propName) return null;
-        // propName may be a single name or a list of accepted aliases.
-        const targets = new Set(
-            (Array.isArray(propName) ? propName : [propName])
-                .filter(Boolean)
-                .map(n => String(n).trim().toLowerCase())
-        );
-        if (targets.size === 0) return null;
-        const nameKeys  = ['name', 'label', 'key', 'propertyName', 'fieldName', 'title', 'displayName', 'code'];
-        const valueKeys = ['value', 'stringValue', 'dateValue', 'val', 'text', 'data', 'content'];
 
-        const pickValue = (o) => {
-            for (const vk of valueKeys) {
-                if (o[vk] !== undefined && o[vk] !== null && o[vk] !== '') return o[vk];
+        const rawPropList = Array.isArray(propName) ? propName : [propName];
+
+        const normalize = (str) => {
+            if (typeof str !== 'string' && typeof str !== 'number') return '';
+            return String(str)
+                .replace(/[\u00a0\s]+/g, ' ')
+                .trim()
+                .toLowerCase()
+                .normalize('NFD')
+                .replace(/[\u0300-\u036f]/g, '');
+        };
+
+        const stripPrepositions = (str) => {
+            return str.replace(/\b(de|di|del|della|dello)\b/g, ' ').replace(/\s+/g, ' ').trim();
+        };
+
+        const targetSet = new Set();
+        const flexTargetSet = new Set();
+
+        for (const p of rawPropList) {
+            if (!p) continue;
+            const norm = normalize(p);
+            if (norm) {
+                targetSet.add(norm);
+                flexTargetSet.add(stripPrepositions(norm));
+            }
+        }
+
+        if (targetSet.size === 0) return null;
+
+        const nameKeys  = ['name', 'label', 'key', 'propertyName', 'fieldName', 'title', 'displayName', 'code', 'id'];
+        const valueKeys = ['value', 'stringValue', 'dateValue', 'val', 'text', 'data', 'content', 'formattedValue', 'displayValue', 'rawValue'];
+
+        const pickPrimitiveValue = (v) => {
+            if (v == null || v === '') return null;
+            if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' || v instanceof Date) return v;
+            if (Array.isArray(v) && v.length > 0) return pickPrimitiveValue(v[0]);
+            if (typeof v === 'object') {
+                for (const vk of valueKeys) {
+                    if (v[vk] !== undefined && v[vk] !== null && v[vk] !== '') {
+                        const pv = pickPrimitiveValue(v[vk]);
+                        if (pv != null) return pv;
+                    }
+                }
             }
             return null;
         };
 
+        const matchesTarget = (candidateName) => {
+            if (typeof candidateName !== 'string' && typeof candidateName !== 'number') return false;
+            const norm = normalize(candidateName);
+            if (!norm) return false;
+            if (targetSet.has(norm)) return true;
+            const flexNorm = stripPrepositions(norm);
+            if (flexTargetSet.has(flexNorm)) return true;
+            return false;
+        };
+
+        const extractFromItem = (item) => {
+            if (item == null || typeof item !== 'object') return null;
+
+            let matched = false;
+            for (const nk of nameKeys) {
+                if (matchesTarget(item[nk])) {
+                    matched = true;
+                    break;
+                }
+            }
+
+            if (!matched) {
+                const subObjs = [item.customProperty, item.property, item.field, item.definition, item.attribute];
+                for (const sub of subObjs) {
+                    if (sub && typeof sub === 'object') {
+                        for (const nk of nameKeys) {
+                            if (matchesTarget(sub[nk])) {
+                                matched = true;
+                                break;
+                            }
+                        }
+                    }
+                    if (matched) break;
+                }
+            }
+
+            if (matched) {
+                const val = pickPrimitiveValue(item);
+                if (val != null) return val;
+            }
+
+            return null;
+        };
+
+        // Check direct root properties on contact object
+        for (const k of Object.keys(contact)) {
+            if (matchesTarget(k)) {
+                const val = pickPrimitiveValue(contact[k]);
+                if (val != null) return val;
+            }
+        }
+
+        // Check custom property container fields
         const containers = [
             contact.customProperties, contact.customFields, contact.properties,
-            contact.customPropertyValues, contact.customValues, contact.fields
+            contact.customPropertyValues, contact.customValues, contact.fields,
+            contact.data, contact.attributes, contact.extendedProperties, contact.extraProperties
         ];
 
         for (const cont of containers) {
             if (!cont) continue;
+
             if (Array.isArray(cont)) {
                 for (const item of cont) {
-                    if (!item || typeof item !== 'object') continue;
-                    for (const nk of nameKeys) {
-                        if (typeof item[nk] === 'string' && targets.has(item[nk].trim().toLowerCase())) {
-                            const v = pickValue(item);
-                            if (v != null) return v;
-                        }
-                    }
+                    const res = extractFromItem(item);
+                    if (res != null) return res;
                 }
             } else if (typeof cont === 'object') {
-                for (const k of Object.keys(cont)) {
-                    if (!targets.has(k.trim().toLowerCase())) continue;
-                    const v = cont[k];
+                for (const [k, v] of Object.entries(cont)) {
+                    if (matchesTarget(k)) {
+                        const val = pickPrimitiveValue(v);
+                        if (val != null) return val;
+                    }
                     if (v && typeof v === 'object') {
-                        const pv = pickValue(v);
-                        if (pv != null) return pv;
-                    } else if (v != null && v !== '') {
-                        return v;
+                        const res = extractFromItem(v);
+                        if (res != null) return res;
                     }
                 }
             }
         }
+
         return null;
     },
 
-    // Parses a contract date that may arrive as ISO, dd/mm/yyyy or dd-mm-yyyy.
+    // Parses a contract date that may arrive as ISO, dd/mm/yyyy, timestamp, ASP.NET date etc.
     // Returns a Date or null.
     parseContractDate(raw) {
         if (raw == null || raw === '') return null;
         if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
+
+        if (typeof raw === 'number' && !isNaN(raw)) {
+            const d = new Date(raw);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
         const s = String(raw).trim();
         if (!s) return null;
 
-        // ISO-like (yyyy-mm-dd, optionally with time) — unambiguous, trust it.
-        if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
-            const d = new Date(s);
-            if (!isNaN(d.getTime())) return d;
+        // ASP.NET JSON date format /Date(1648771200000)/
+        const aspNetMatch = s.match(/\/Date\((\d+)(?:[+-]\d+)?\)\//i);
+        if (aspNetMatch) {
+            const d = new Date(parseInt(aspNetMatch[1], 10));
+            return isNaN(d.getTime()) ? null : d;
         }
 
-        // European dd/mm/yyyy or dd-mm-yyyy or dd.mm.yyyy
-        const m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
-        if (m) {
-            let dd = +m[1], mm = +m[2], yy = +m[3];
+        // Pure numeric string timestamp
+        if (/^\d{10,13}$/.test(s)) {
+            const ts = parseInt(s, 10);
+            const d = new Date(ts < 1e11 ? ts * 1000 : ts);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        // ISO-like YYYY-MM-DD or YYYY/MM/DD (optionally with time)
+        // Constructing with local components (year, month - 1, day) avoids UTC/timezone shifts.
+        const isoMatch = s.match(/^(\d{4})[\/\-.](\d{1,2})[\/\-.](\d{1,2})/);
+        if (isoMatch) {
+            const yy = +isoMatch[1], mm = +isoMatch[2], dd = +isoMatch[3];
+            const d = new Date(yy, mm - 1, dd);
+            return isNaN(d.getTime()) ? null : d;
+        }
+
+        // European dd/mm/yyyy or dd-mm-yyyy or dd.mm.yyyy (optionally with time)
+        const euMatch = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+        if (euMatch) {
+            let dd = +euMatch[1], mm = +euMatch[2], yy = +euMatch[3];
             if (yy < 100) yy += 2000;
             const d = new Date(yy, mm - 1, dd);
-            if (!isNaN(d.getTime())) return d;
+            return isNaN(d.getTime()) ? null : d;
         }
 
-        // Last resort: let the engine try.
+        // Fallback standard parse
         const d = new Date(s);
         return isNaN(d.getTime()) ? null : d;
     },
@@ -1769,12 +1905,12 @@ const App = {
 
             // Determine lower cutoff for cycle dates
             let minDate;
-            if (!includePast) {
-                minDate = today;
-            } else if (fallbackStart < today) {
-                minDate = fallbackStart;
-            } else {
+            if (includePast) {
                 minDate = null;
+            } else {
+                // If includePast is false, cutoff at user-specified fallbackStart or today (whichever is appropriate)
+                minDate = fallbackStart ? new Date(fallbackStart) : today;
+                minDate.setHours(0, 0, 0, 0);
             }
 
             this.contactsData.forEach(contact => {
@@ -1808,8 +1944,7 @@ const App = {
                 for (let i = 0; ; i += monthsFrequency) {
                     const cycleStartDate = this.addMonths(baseStartDate, i);
                     if (cycleStartDate >= windowEnd) break;   // past the window
-                    if (i > 12 * 300) break;                      // safety net
-                    if (minDate && cycleStartDate < minDate) continue;
+                    if (i > 12 * 300) break;                  // safety net
 
                     // Planning period = the full maintenance cycle: from the
                     // activation date to the day before the next cycle starts.
@@ -1823,6 +1958,9 @@ const App = {
                         plannedStart = new Date(cycleStartDate);
                         plannedEnd   = new Date(nextCycleStart.getFullYear(), nextCycleStart.getMonth(), nextCycleStart.getDate() - 1);
                     }
+
+                    // A cycle is past (and skipped) ONLY if its planned end date is before minDate
+                    if (minDate && plannedEnd < minDate) continue;
 
                     const activationAnchor = useCalendarMonth ? plannedStart : cycleStartDate;
                     const actualActivationDate = new Date(offsetDaysInput > 0 ? plannedEnd : activationAnchor);
