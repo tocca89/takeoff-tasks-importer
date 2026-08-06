@@ -247,19 +247,24 @@
                         <!-- Date range input parameters -->
                         <div class="generator-config">
                             <div class="form-row">
-                                <div class="form-group col-4">
+                                <div class="form-group col-3">
                                     <label for="input-start-date" data-i18n="generator.start_date">Fecha de Inicio (fallback)</label>
                                     <input type="date" id="input-start-date" value="">
-                                    <p class="field-hint" data-i18n="generator.start_date_hint" style="margin-top:5px;">Solo se usa para contactos sin la propiedad "Fecha Contrato Mantenimiento".</p>
+                                    <p class="field-hint" data-i18n="generator.start_date_hint" style="margin-top:5px;">Solo se usa para contactos sin "Fecha Contrato Mantenimiento".</p>
                                 </div>
-                                <div class="form-group col-4">
+                                <div class="form-group col-3">
+                                    <label for="input-end-date" data-i18n="generator.end_date">Fecha de Fin (opcional)</label>
+                                    <input type="date" id="input-end-date" value="">
+                                    <p class="field-hint" data-i18n="generator.end_date_hint" style="margin-top:5px;">Límite opcional: solo se generan tareas hasta esta fecha.</p>
+                                </div>
+                                <div class="form-group col-3">
                                     <label for="input-duration-months" data-i18n="generator.duration">Duración de la Generación</label>
                                     <div class="input-with-unit">
                                         <input type="number" id="input-duration-months" value="12" min="1" max="60">
                                         <span class="input-unit" data-i18n="generator.duration_unit">Meses</span>
                                     </div>
                                 </div>
-                                <div class="form-group col-4">
+                                <div class="form-group col-3">
                                     <label for="input-activation-offset" data-i18n="generator.offset_days">Días de antelación (Activación)</label>
                                     <div class="input-with-unit">
                                         <input type="number" id="input-activation-offset" value="" min="0" max="365" placeholder="0">

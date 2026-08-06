@@ -434,6 +434,10 @@ textarea:focus {
     flex: 0 0 calc(33.33% - 10.6px);
 }
 
+.col-3 {
+    flex: 0 0 calc(25% - 12px);
+}
+
 .justify-end {
     display: flex;
     align-items: flex-end;
@@ -1639,7 +1643,7 @@ input:checked + .slider:before {
         flex-direction: column;
         gap: 0;
     }
-    .col-4, .col-6 {
+    .col-3, .col-4, .col-6 {
         flex: 1 1 100%;
     }
     .preview-toolbar {

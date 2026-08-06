@@ -65,6 +65,8 @@ const TRANSLATIONS = {
         'generator.title': 'Calendario de Mantenimientos',
         'generator.start_date': 'Fecha de Inicio (fallback)',
         'generator.start_date_hint': 'Solo se usa para contactos sin la propiedad "Fecha Contrato Mantenimiento". Cada contacto arranca su ciclo en su propia fecha de contrato.',
+        'generator.end_date': 'Fecha de Fin (opcional)',
+        'generator.end_date_hint': 'Límite opcional: solo se generan tareas hasta esta fecha.',
         'generator.duration': 'Duración de la Generación',
         'generator.duration_unit': 'Meses',
         'generator.offset_days': 'Días de antelación (Activación)',
@@ -275,6 +277,8 @@ const TRANSLATIONS = {
         'generator.title': 'Calendario Manutenzioni',
         'generator.start_date': 'Data di Inizio (fallback)',
         'generator.start_date_hint': 'Usata solo per i contatti privi della proprietà "Data inizio manutenzione" (o "Fecha Contrato Mantenimiento"). Ogni contatto avvia il suo ciclo dalla propria data di contratto.',
+        'generator.end_date': 'Data di Fine (opzionale)',
+        'generator.end_date_hint': 'Limite opzionale: vengono generati solo gli incarichi fino a questa data.',
         'generator.duration': 'Durata della Generazione',
         'generator.duration_unit': 'Mesi',
         'generator.offset_days': 'Giorni di anticipo (Attivazione)',
@@ -1026,7 +1030,7 @@ const App = {
         document.getElementById('btn-generate-schedule').addEventListener('click', () => this.generateSchedule());
         document.getElementById('preview-search').addEventListener('input', (e) => this.filterPreview(e.target.value));
         document.getElementById('select-all-tasks').addEventListener('change', (e) => this.toggleSelectAll(e.target.checked));
-        ['input-start-date', 'input-duration-months', 'input-activation-offset', 'input-calendar-month', 'input-include-past'].forEach(id => {
+        ['input-start-date', 'input-end-date', 'input-duration-months', 'input-activation-offset', 'input-calendar-month', 'input-include-past'].forEach(id => {
             document.getElementById(id)?.addEventListener('change', () => this._resetScheduleIfGenerated());
         });
 
@@ -1875,6 +1879,8 @@ const App = {
         const startDateInput = document.getElementById('input-start-date').value;
         if (!startDateInput) { alert(this.t('alert.no_start_date')); return; }
 
+        const endDateInput = document.getElementById('input-end-date')?.value;
+
         const durationInput = parseInt(document.getElementById('input-duration-months').value);
         if (isNaN(durationInput) || durationInput <= 0) {
             alert(this.t('alert.invalid_duration'));
@@ -1897,13 +1903,30 @@ const App = {
             const titleTemplate = document.getElementById('template-title').value;
             const descTemplate  = document.getElementById('template-description').value;
             const fallbackStart = new Date(startDateInput);
+            fallbackStart.setHours(0, 0, 0, 0);
+
+            let userEndDate = null;
+            if (endDateInput) {
+                userEndDate = new Date(endDateInput);
+                userEndDate.setHours(23, 59, 59, 999);
+            }
+
             const tasks         = [];
             const localeLang    = this.lang === 'it' ? 'it-IT' : 'es-ES';
             let fallbackCount   = 0;
 
             const today     = new Date(); today.setHours(0, 0, 0, 0);
             const refDate   = (fallbackStart > today) ? fallbackStart : today;
-            const windowEnd = this.addMonths(refDate, this.durationMonths);
+            let windowEnd   = this.addMonths(refDate, this.durationMonths);
+
+            if (userEndDate) {
+                const limitWindow = new Date(userEndDate);
+                limitWindow.setDate(limitWindow.getDate() + 1);
+                limitWindow.setHours(0, 0, 0, 0);
+                if (limitWindow < windowEnd) {
+                    windowEnd = limitWindow;
+                }
+            }
 
             // Determine lower cutoff for cycle dates
             let minDate;
@@ -1960,6 +1983,9 @@ const App = {
                         plannedStart = new Date(cycleStartDate);
                         plannedEnd   = new Date(nextCycleStart.getFullYear(), nextCycleStart.getMonth(), nextCycleStart.getDate() - 1);
                     }
+
+                    // Stop cycle generation if plannedStart is beyond user-defined Fecha de Fin
+                    if (userEndDate && plannedStart > userEndDate) break;
 
                     // A cycle is past (and skipped) ONLY if its planned end date is before minDate
                     if (minDate && plannedEnd < minDate) continue;
