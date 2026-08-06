@@ -90,6 +90,8 @@ const TRANSLATIONS = {
         'generator.edit_title': 'Editar tarea',
         'generator.check_existing_label': 'Verificar tareas existentes antes de crear',
         'generator.check_existing_hint': 'Más lento pero evita duplicados si algunos contactos ya fueron procesados.',
+        'generator.activate_directly_label': 'Activar directamente todas las tareas creadas',
+        'generator.activate_directly_hint': 'Si se activa, las tareas se crearán en estado activo inmediatamente, sin quedar en espera hasta su fecha de activación.',
         'generator.calendar_month_label': 'Período de referencia: mes solar',
         'generator.calendar_month_hint': 'Si está activo, la planificación y la fecha de activación se alinearán con el primer y el último día del mes solar (ej. del 01 al 30/31).',
         'generator.include_past_label': 'Permitir la creación de tareas pasadas',
@@ -158,6 +160,7 @@ const TRANSLATIONS = {
         'preview.fallback_badge_title': 'Sin fecha de contrato — usando la fecha de inicio fallback',
         'preview.contract_date': 'Fecha de contrato de mantenimiento',
         'log.check_existing_active': 'Verificación de duplicados activa — cada tarea se comprobará antes de crearse.',
+        'log.activate_directly_active': 'Activación directa activa — las tareas se crearán en estado activo inmediatamente.',
         'log.bulk_start': 'Iniciando creación masiva de {n} tareas...',
         'log.project_creating': 'Creando proyecto "{name}" para {n} contactos...',
         'log.project_created': 'Proyecto creado para {client} (jobId {id})',
@@ -302,6 +305,8 @@ const TRANSLATIONS = {
         'generator.edit_title': 'Modifica incarico',
         'generator.check_existing_label': 'Verifica incarichi esistenti prima di creare',
         'generator.check_existing_hint': 'Più lento ma evita duplicati se alcuni contatti sono già stati elaborati.',
+        'generator.activate_directly_label': 'Attiva direttamente tutti gli incarichi creati',
+        'generator.activate_directly_hint': 'Se attivo, gli incarichi verranno creati in stato attivo immediatamente, senza rimanere in attesa fino alla data di attivazione.',
         'generator.calendar_month_label': 'Periodo di riferimento: mese solare',
         'generator.calendar_month_hint': 'Se attivo, la pianificazione e la data di attivazione si allineeranno sempre al primo e all\'ultimo giorno del mese solare (es. dal 01 al 30/31).',
         'generator.include_past_label': 'Consenti la creazione di incarichi passati',
@@ -370,6 +375,7 @@ const TRANSLATIONS = {
         'preview.fallback_badge_title': 'Nessuna data di contratto — usata la data di inizio fallback',
         'preview.contract_date': 'Data di contratto di manutenzione',
         'log.check_existing_active': 'Verifica duplicati attiva — ogni incarico verrà controllato prima della creazione.',
+        'log.activate_directly_active': 'Attivazione diretta attiva — gli incarichi verranno creati in stato attivo immediatamente.',
         'log.bulk_start': 'Avvio creazione massiva di {n} incarichi...',
         'log.project_creating': 'Creazione progetto "{name}" per {n} contatti...',
         'log.project_created': 'Progetto creato per {client} (jobId {id})',
@@ -2341,9 +2347,14 @@ const App = {
             }
         }
 
-        const checkExisting = document.getElementById('input-check-existing').checked;
+        const checkExisting   = document.getElementById('input-check-existing')?.checked || false;
+        const activateDirectly = document.getElementById('input-activate-directly')?.checked || false;
+
         if (checkExisting) {
             this.log(this.t('log.check_existing_active'), 'info');
+        }
+        if (activateDirectly) {
+            this.log(this.t('log.activate_directly_active'), 'info');
         }
 
         const queue = [...tasksToCreate];
@@ -2361,7 +2372,8 @@ const App = {
             priority,
             important,
             jobOverrideMap,
-            checkExisting
+            checkExisting,
+            activateDirectly
         };
 
         this.activeWorkersCount = 2;
@@ -2415,11 +2427,14 @@ const App = {
                     ? this.formatDateTimeIsoLocal(task.startValidityDate)
                     : null;
 
-                // Se la data di attivazione è futura, impostiamo lo stato a 0 (Pending) in modo che 
-                // il CRM la mantenga in attesa e la attivi solo alla data startValidityDate.
-                // Altrimenti, se è già passata o oggi, la creiamo come 1 (Accepted - attiva).
+                // Activation state:
+                // If activateDirectly is checked, state = 1 (Accepted/Active immediately) and taskValidityType = 0.
+                // Otherwise: state = 0 if future, 1 if past/today, taskValidityType = 10 (Válido a partir de fecha).
                 const now = new Date();
-                const taskState = (task.startValidityDate instanceof Date && task.startValidityDate > now) ? 0 : 1;
+                const taskState = params.activateDirectly
+                    ? 1
+                    : ((task.startValidityDate instanceof Date && task.startValidityDate > now) ? 0 : 1);
+                const validityType = params.activateDirectly ? 0 : 10;
 
                 // Optional duplicate check
                 if (params.checkExisting) {
@@ -2450,10 +2465,8 @@ const App = {
                     completeBefore: plannedEndIso,
                     creatorUserId:  this.connectedUser.id,
                     ...(params.assignedEntityIds.length > 0 && { assignedEntityIds: params.assignedEntityIds }),
-                    // Task activation: "Válido a partir de fecha" (taskValidityType 10),
-                    // activated from the first day of the maintenance cycle.
                     ...(startValidityIso && { 
-                        taskValidityType: 10, 
+                        taskValidityType: validityType, 
                         startValidityDate: startValidityIso,
                         state: taskState
                     }),

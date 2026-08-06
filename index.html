@@ -351,7 +351,7 @@
                                         placeholder="Ej: Mantenimiento 2026 — se creará un Proyecto en cada contacto"
                                         style="font-size:0.9rem;">
                                 </div>
-                                <!-- Optional duplicate check toggle -->
+                                 <!-- Optional duplicate check toggle -->
                                 <div class="form-group check-existing-group" style="margin-bottom:12px;">
                                     <div class="checkbox-wrapper">
                                         <label class="switch">
@@ -361,6 +361,17 @@
                                         <span class="switch-label" data-i18n="generator.check_existing_label">Verificar tareas existentes antes de crear</span>
                                     </div>
                                     <p class="field-hint" style="margin-top:4px;" data-i18n="generator.check_existing_hint">Más lento pero evita duplicados si algunos contactos ya fueron procesados.</p>
+                                </div>
+                                <!-- Direct activation toggle -->
+                                <div class="form-group activate-directly-group" style="margin-bottom:16px;">
+                                    <div class="checkbox-wrapper">
+                                        <label class="switch">
+                                            <input type="checkbox" id="input-activate-directly">
+                                            <span class="slider round"></span>
+                                        </label>
+                                        <span class="switch-label" data-i18n="generator.activate_directly_label">Activar directamente todas las tareas creadas</span>
+                                    </div>
+                                    <p class="field-hint" style="margin-top:4px;" data-i18n="generator.activate_directly_hint">Si se activa, las tareas se crearán en estado activo inmediatamente, sin quedar en espera hasta su fecha de activación.</p>
                                 </div>
                                 <button type="button" id="btn-bulk-create" class="btn btn-success btn-lg">
                                     <span class="btn-text" data-i18n="generator.create_btn">Crear en Bloque en TakeOff CRM</span>
