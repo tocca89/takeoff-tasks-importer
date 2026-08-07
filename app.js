@@ -1233,7 +1233,8 @@ const App = {
 
             const [usersList, groupsList] = await Promise.all([
                 this.client.getUsers(),
-                this.client.getGroups()
+                this.client.getGroups(),
+                this.loadMgmtContacts()
             ]);
             this.users  = usersList;
             this.groups = groupsList;
@@ -2696,19 +2697,55 @@ const App = {
         document.getElementById('input-delete-csv-file').value = '';
     },
 
+    async loadMgmtContacts() {
+        try {
+            this.mgmtContacts = [];
+            for (let skip = 0; skip < 2000; skip += 1000) {
+                const response = await this.client.request('/api/contacts/search', {
+                    method: 'POST',
+                    headers: this.client.getHeaders(),
+                    body: JSON.stringify({ skip, take: 1000 })
+                });
+                if (!response.ok) break;
+                const data = await response.json();
+                const val = data.value !== undefined ? data.value : data;
+                const contacts = val.data !== undefined ? val.data : (Array.isArray(val) ? val : []);
+                
+                const mapped = contacts.map(c => ({
+                    contactId: c.id,
+                    clientName: c.displayName || c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim() || `ID: ${c.id}`
+                }));
+                this.mgmtContacts = this.mgmtContacts.concat(mapped);
+                if (contacts.length < 1000) break;
+            }
+            this.updateMgmtClientSelect();
+        } catch (e) {
+            console.warn("Could not load contacts for mgmt panel:", e);
+        }
+    },
+
     updateMgmtClientSelect() {
         const select = document.getElementById('select-mgmt-client');
         if (!select) return;
         const currentVal = select.value;
         select.innerHTML = `<option value="">${this.t('mgmt.client_all')}</option>`;
-        if (this.contactsData && this.contactsData.length > 0) {
-            const sorted = [...this.contactsData].sort((a, b) =>
+        
+        const contactsList = (this.contactsData && this.contactsData.length > 0)
+            ? this.contactsData
+            : (this.mgmtContacts || []);
+
+        if (contactsList.length > 0) {
+            const sorted = [...contactsList].sort((a, b) =>
                 (a.clientName || '').localeCompare(b.clientName || '', undefined, { sensitivity: 'base' })
             );
+            const seen = new Set();
             sorted.forEach(c => {
+                const id = c.contactId || c.id;
+                if (!id || seen.has(id)) return;
+                seen.add(id);
                 const opt = document.createElement('option');
-                opt.value = c.contactId;
-                opt.textContent = c.clientName ? `${c.clientName} (ID: ${c.contactId})` : `ID: ${c.contactId}`;
+                opt.value = id;
+                opt.textContent = c.clientName ? `${c.clientName} (ID: ${id})` : `ID: ${id}`;
                 select.appendChild(opt);
             });
         }
@@ -2799,7 +2836,7 @@ const App = {
                 if (t.contact) {
                     clientName = t.contact.displayName || t.contact.name || `${t.contact.firstName || ''} ${t.contact.lastName || ''}`.trim() || 'N/D';
                 } else if (t.contactId) {
-                    const matchedContact = this.contactsData.find(c => c.contactId === t.contactId);
+                    const matchedContact = (this.contactsData || []).find(c => c.contactId === t.contactId) || (this.mgmtContacts || []).find(c => c.contactId === t.contactId);
                     if (matchedContact) {
                         clientName = matchedContact.clientName || matchedContact.displayName || 'N/D';
                     } else {
