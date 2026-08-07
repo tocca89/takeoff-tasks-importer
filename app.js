@@ -1126,6 +1126,22 @@ const App = {
         });
         document.getElementById('input-mgmt-client-search')?.addEventListener('input', (e) => {
             this.filterMgmtClients(e.target.value);
+            const select = document.getElementById('select-mgmt-client');
+            const matchedId = this.getSelectedContactId();
+            if (select && matchedId) {
+                select.value = String(matchedId);
+            }
+        });
+        document.getElementById('select-mgmt-client')?.addEventListener('change', (e) => {
+            const selectedOpt = e.target.selectedOptions[0];
+            const searchInput = document.getElementById('input-mgmt-client-search');
+            if (searchInput) {
+                if (e.target.value === '') {
+                    searchInput.value = '';
+                } else if (selectedOpt && selectedOpt.textContent) {
+                    searchInput.value = selectedOpt.textContent;
+                }
+            }
         });
         document.getElementById('btn-search-future-tasks').addEventListener('click', () => this.searchFutureTasks());
         
@@ -2778,42 +2794,90 @@ const App = {
         }
     },
 
-    filterMgmtClients(query) {
-        const q = (query || '').toLowerCase().trim();
-        const select = document.getElementById('select-mgmt-client');
-        if (!select) return;
-        const currentVal = select.value;
-        select.innerHTML = `<option value="">${this.t('mgmt.client_all')}</option>`;
+    getSelectedContactId() {
+        const selectVal = document.getElementById('select-mgmt-client')?.value;
+        if (selectVal) return parseInt(selectVal);
 
+        const inputVal = (document.getElementById('input-mgmt-client-search')?.value || '').trim();
+        if (!inputVal) return null;
+
+        // Extract ID from format like "Acme SRL [Cod: CLI-001] (ID: 2478798)"
+        const idMatch = inputVal.match(/\(ID:\s*(\d+)\)/i);
+        if (idMatch) return parseInt(idMatch[1]);
+
+        // Pure numeric string
+        if (/^\d+$/.test(inputVal)) return parseInt(inputVal);
+
+        // Search contact in loaded contacts by name, code or ID
+        const q = inputVal.toLowerCase();
         const contactsList = (this.contactsData && this.contactsData.length > 0)
             ? this.contactsData
             : (this.mgmtContacts || []);
 
-        const filtered = contactsList.filter(c => {
-            if (!q) return true;
+        const matched = contactsList.find(c => {
             const name = (c.clientName || c.displayName || c.rawName || '').toLowerCase();
             const code = String(c.code || c.referenceCode || '').toLowerCase();
             const id = String(c.contactId || c.id || '');
-            return name.includes(q) || code.includes(q) || id.includes(q);
+            return name === q || code === q || id === q || name.includes(q) || code.includes(q);
         });
 
-        const sorted = [...filtered].sort((a, b) =>
-            (a.clientName || '').localeCompare(b.clientName || '', undefined, { sensitivity: 'base' })
-        );
+        if (matched) {
+            return parseInt(matched.contactId || matched.id);
+        }
 
-        const seen = new Set();
-        sorted.forEach(c => {
-            const id = c.contactId || c.id;
-            if (!id || seen.has(id)) return;
-            seen.add(id);
-            const opt = document.createElement('option');
-            opt.value = id;
-            opt.textContent = c.clientName ? c.clientName : `ID: ${id}`;
-            select.appendChild(opt);
-        });
+        return null;
+    },
 
-        if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
-            select.value = currentVal;
+    filterMgmtClients(query) {
+        const q = (query || '').toLowerCase().trim();
+        const select = document.getElementById('select-mgmt-client');
+        const datalist = document.getElementById('mgmt-client-datalist');
+
+        if (select) {
+            const currentVal = select.value;
+            select.innerHTML = `<option value="">${this.t('mgmt.client_all')}</option>`;
+
+            const contactsList = (this.contactsData && this.contactsData.length > 0)
+                ? this.contactsData
+                : (this.mgmtContacts || []);
+
+            const filtered = contactsList.filter(c => {
+                if (!q) return true;
+                const name = (c.clientName || c.displayName || c.rawName || '').toLowerCase();
+                const code = String(c.code || c.referenceCode || '').toLowerCase();
+                const id = String(c.contactId || c.id || '');
+                return name.includes(q) || code.includes(q) || id.includes(q);
+            });
+
+            const sorted = [...filtered].sort((a, b) =>
+                (a.clientName || '').localeCompare(b.clientName || '', undefined, { sensitivity: 'base' })
+            );
+
+            if (datalist) datalist.innerHTML = '';
+
+            const seen = new Set();
+            sorted.forEach(c => {
+                const id = c.contactId || c.id;
+                if (!id || seen.has(id)) return;
+                seen.add(id);
+
+                const label = c.clientName ? c.clientName : `ID: ${id}`;
+
+                const opt = document.createElement('option');
+                opt.value = id;
+                opt.textContent = label;
+                select.appendChild(opt);
+
+                if (datalist) {
+                    const dOpt = document.createElement('option');
+                    dOpt.value = label;
+                    datalist.appendChild(dOpt);
+                }
+            });
+
+            if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+                select.value = currentVal;
+            }
         }
     },
 
@@ -2829,7 +2893,7 @@ const App = {
             return;
         }
 
-        const selectedContactId = document.getElementById('select-mgmt-client')?.value;
+        const selectedContactId = this.getSelectedContactId();
 
         const btn = document.getElementById('btn-search-future-tasks');
         const originalHtml = btn.innerHTML;

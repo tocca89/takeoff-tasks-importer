@@ -427,12 +427,15 @@
                                 </div>
                                 <div class="form-row">
                                     <div class="form-group col-6" style="margin-bottom: 12px;">
-                                        <label for="select-mgmt-client" data-i18n="mgmt.client_label">Cliente</label>
+                                        <label for="input-mgmt-client-search" data-i18n="mgmt.client_label">Cliente (Nombre, Código o ID)</label>
                                         <input type="text" id="input-mgmt-client-search" 
+                                               list="mgmt-client-datalist"
                                                data-i18n-placeholder="mgmt.client_search_placeholder" 
                                                placeholder="Buscar por nombre, código o ID..." 
-                                               style="font-size: 0.82rem; padding: 6px 10px; height: 32px; margin-bottom: 6px;">
-                                        <select id="select-mgmt-client">
+                                               autocomplete="off"
+                                               style="font-size: 0.82rem; padding: 6px 10px; height: 34px; margin-bottom: 6px;">
+                                        <datalist id="mgmt-client-datalist"></datalist>
+                                        <select id="select-mgmt-client" style="font-size: 0.8rem;">
                                             <option value="" data-i18n="mgmt.client_all">Todos los clientes</option>
                                         </select>
                                     </div>
