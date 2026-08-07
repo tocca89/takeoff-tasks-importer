@@ -428,6 +428,10 @@
                                 <div class="form-row">
                                     <div class="form-group col-6" style="margin-bottom: 12px;">
                                         <label for="select-mgmt-client" data-i18n="mgmt.client_label">Cliente</label>
+                                        <input type="text" id="input-mgmt-client-search" 
+                                               data-i18n-placeholder="mgmt.client_search_placeholder" 
+                                               placeholder="Buscar por nombre, código o ID..." 
+                                               style="font-size: 0.82rem; padding: 6px 10px; height: 32px; margin-bottom: 6px;">
                                         <select id="select-mgmt-client">
                                             <option value="" data-i18n="mgmt.client_all">Todos los clientes</option>
                                         </select>
@@ -451,6 +455,32 @@
                                                 <span class="slider round"></span>
                                             </label>
                                             <span class="switch-label" data-i18n="mgmt.only_uncompleted_label">Solo no completadas</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Additional Cleanup Options -->
+                                <div class="mgmt-options-box" style="margin-bottom: 16px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
+                                    <h5 style="margin: 0 0 10px 0; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; color: var(--accent);">
+                                        <i class="fa-solid fa-sliders"></i>
+                                        <span data-i18n="mgmt.options_title">Opciones Adicionales de Limpieza del Cliente</span>
+                                    </h5>
+                                    <div class="form-group" style="margin-bottom: 8px;">
+                                        <div class="checkbox-wrapper">
+                                            <label class="switch">
+                                                <input type="checkbox" id="input-mgmt-clear-custom-prop">
+                                                <span class="slider round"></span>
+                                            </label>
+                                            <span class="switch-label" style="font-size: 0.8rem;" data-i18n="mgmt.clear_custom_prop_label">Eliminar Fecha Contrato Mantenimiento (Propiedad Personalizada)</span>
+                                        </div>
+                                    </div>
+                                    <div class="form-group" style="margin-bottom: 4px;">
+                                        <div class="checkbox-wrapper">
+                                            <label class="switch">
+                                                <input type="checkbox" id="input-mgmt-remove-contact-type">
+                                                <span class="slider round"></span>
+                                            </label>
+                                            <span class="switch-label" style="font-size: 0.8rem;" data-i18n="mgmt.remove_contact_type_label">Quitar Tipo de Contacto del Cliente (ej: Mensual, Trimestral)</span>
                                         </div>
                                     </div>
                                 </div>

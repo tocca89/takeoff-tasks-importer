@@ -196,6 +196,10 @@ const TRANSLATIONS = {
         'mgmt.search_section': 'Buscar y Eliminar Tareas Futuras',
         'mgmt.client_label': 'Cliente',
         'mgmt.client_all': 'Todos los clientes',
+        'mgmt.client_search_placeholder': 'Buscar por nombre, código o ID cliente...',
+        'mgmt.options_title': 'Opciones Adicionales de Limpieza del Cliente',
+        'mgmt.clear_custom_prop_label': 'Eliminar Fecha Contrato Mantenimiento (Propiedad Personalizada)',
+        'mgmt.remove_contact_type_label': 'Quitar Tipo de Contacto del Cliente (ej: Mensual, Trimestral)',
         'mgmt.task_type_label': 'Tipo de Tarea',
         'mgmt.task_type_placeholder': 'Selecciona un tipo de tarea...',
         'mgmt.date_from_label': 'A partir de la fecha (inclusive)',
@@ -219,6 +223,10 @@ const TRANSLATIONS = {
         'log.mgmt_delete_ok': 'OK: Tarea {id} eliminada.',
         'log.mgmt_delete_err': 'ERR: No se pudo eliminar la tarea {id}: {msg}',
         'log.mgmt_delete_complete': 'Eliminación completada. Éxito: {success}, Errores: {failure}.',
+        'log.custom_prop_cleared': 'OK: Propiedad personalizada "Fecha Contrato" restablecida para el cliente {id}.',
+        'log.contact_type_removed': 'OK: Tipo de contacto quitado para el cliente {id}.',
+        'log.custom_prop_err': 'ERR: No se pudo restablecer la propiedad personalizada para el cliente {id}: {msg}',
+        'log.contact_type_err': 'ERR: No se pudo quitar el tipo de contacto para el cliente {id}: {msg}',
         'progress.delete_title': 'Eliminación de Tareas en Curso...',
         'progress.delete_success_label': 'Eliminadas con Éxito',
         'progress.delete_failure_label': 'Errores / Fallidas',
@@ -413,6 +421,10 @@ const TRANSLATIONS = {
         'mgmt.search_section': 'Cerca ed Elimina Incarichi Futuri',
         'mgmt.client_label': 'Cliente',
         'mgmt.client_all': 'Tutti i clienti',
+        'mgmt.client_search_placeholder': 'Cerca per nome, codice o ID cliente...',
+        'mgmt.options_title': 'Opzioni Aggiuntive di Pulizia Cliente',
+        'mgmt.clear_custom_prop_label': 'Elimina Data Contratto Manutenzione (Proprietà Personalizzata)',
+        'mgmt.remove_contact_type_label': 'Rimuovi Tipo Contatto dal Cliente (es: Mensile, Trimestrale)',
         'mgmt.task_type_label': 'Tipo di Incarico',
         'mgmt.task_type_placeholder': 'Seleziona un tipo di incarico...',
         'mgmt.date_from_label': 'A partire dalla data (inclusa)',
@@ -436,6 +448,10 @@ const TRANSLATIONS = {
         'log.mgmt_delete_ok': 'OK: Incarico {id} eliminato.',
         'log.mgmt_delete_err': 'ERR: Impossibile eliminare l\'incarico {id}: {msg}',
         'log.mgmt_delete_complete': 'Eliminazione completata. Successo: {success}, Errori: {failure}.',
+        'log.custom_prop_cleared': 'OK: Proprietà personalizzata "Data Contratto" azzerata per il cliente {id}.',
+        'log.contact_type_removed': 'OK: Tipo contatto rimosso per il cliente {id}.',
+        'log.custom_prop_err': 'ERR: Impossibile azzerare la proprietà personalizzata per il cliente {id}: {msg}',
+        'log.contact_type_err': 'ERR: Impossibile rimuovere il tipo contatto per il cliente {id}: {msg}',
         'progress.delete_title': 'Eliminazione Incarichi in Corso...',
         'progress.delete_success_label': 'Eliminati con Successo',
         'progress.delete_failure_label': 'Errori / Falliti',
@@ -656,6 +672,32 @@ class TakeOffClient {
         } catch (e) {
             return null;
         }
+    }
+
+    async updateContactCustomProperties(contactId, customPropertiesPayload) {
+        const response = await this.request(`/api/contacts/${contactId}/customproperties`, {
+            method: 'PUT',
+            headers: this.getHeaders(),
+            body: JSON.stringify(customPropertiesPayload)
+        });
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`HTTP ${response.status}: ${errText}`);
+        }
+        return true;
+    }
+
+    async updateContact(contactId, contactDto) {
+        const response = await this.request(`/api/contacts/${contactId}`, {
+            method: 'PUT',
+            headers: this.getHeaders(),
+            body: JSON.stringify(contactDto)
+        });
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            throw new Error(`HTTP ${response.status}: ${errText}`);
+        }
+        return true;
     }
 
     async getContactsByTypeId(typeId, typeName, skip = 0, take = 100) {
@@ -1081,6 +1123,9 @@ const App = {
             } catch (err) {
                 console.error("Error loading statuses for mgmt task type:", err);
             }
+        });
+        document.getElementById('input-mgmt-client-search')?.addEventListener('input', (e) => {
+            this.filterMgmtClients(e.target.value);
         });
         document.getElementById('btn-search-future-tasks').addEventListener('click', () => this.searchFutureTasks());
         
@@ -2711,10 +2756,19 @@ const App = {
                 const val = data.value !== undefined ? data.value : data;
                 const contacts = val.data !== undefined ? val.data : (Array.isArray(val) ? val : []);
                 
-                const mapped = contacts.map(c => ({
-                    contactId: c.id,
-                    clientName: c.displayName || c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim() || `ID: ${c.id}`
-                }));
+                const mapped = contacts.map(c => {
+                    const name = c.companyName || c.billingCompanyName || c.displayName || c.name || `${c.firstName || ''} ${c.lastName || ''}`.trim() || '';
+                    const code = c.referenceCode || c.code || '';
+                    let label = name || `Cliente ${c.id}`;
+                    if (code) label += ` [Cod: ${code}]`;
+                    label += ` (ID: ${c.id})`;
+                    return {
+                        contactId: c.id,
+                        clientName: label,
+                        rawName: name,
+                        code: code
+                    };
+                });
                 this.mgmtContacts = this.mgmtContacts.concat(mapped);
                 if (contacts.length < 1000) break;
             }
@@ -2724,32 +2778,48 @@ const App = {
         }
     },
 
-    updateMgmtClientSelect() {
+    filterMgmtClients(query) {
+        const q = (query || '').toLowerCase().trim();
         const select = document.getElementById('select-mgmt-client');
         if (!select) return;
         const currentVal = select.value;
         select.innerHTML = `<option value="">${this.t('mgmt.client_all')}</option>`;
-        
+
         const contactsList = (this.contactsData && this.contactsData.length > 0)
             ? this.contactsData
             : (this.mgmtContacts || []);
 
-        if (contactsList.length > 0) {
-            const sorted = [...contactsList].sort((a, b) =>
-                (a.clientName || '').localeCompare(b.clientName || '', undefined, { sensitivity: 'base' })
-            );
-            const seen = new Set();
-            sorted.forEach(c => {
-                const id = c.contactId || c.id;
-                if (!id || seen.has(id)) return;
-                seen.add(id);
-                const opt = document.createElement('option');
-                opt.value = id;
-                opt.textContent = c.clientName ? `${c.clientName} (ID: ${id})` : `ID: ${id}`;
-                select.appendChild(opt);
-            });
+        const filtered = contactsList.filter(c => {
+            if (!q) return true;
+            const name = (c.clientName || c.displayName || c.rawName || '').toLowerCase();
+            const code = String(c.code || c.referenceCode || '').toLowerCase();
+            const id = String(c.contactId || c.id || '');
+            return name.includes(q) || code.includes(q) || id.includes(q);
+        });
+
+        const sorted = [...filtered].sort((a, b) =>
+            (a.clientName || '').localeCompare(b.clientName || '', undefined, { sensitivity: 'base' })
+        );
+
+        const seen = new Set();
+        sorted.forEach(c => {
+            const id = c.contactId || c.id;
+            if (!id || seen.has(id)) return;
+            seen.add(id);
+            const opt = document.createElement('option');
+            opt.value = id;
+            opt.textContent = c.clientName ? c.clientName : `ID: ${id}`;
+            select.appendChild(opt);
+        });
+
+        if (currentVal && Array.from(select.options).some(o => o.value === currentVal)) {
+            select.value = currentVal;
         }
-        select.value = currentVal;
+    },
+
+    updateMgmtClientSelect() {
+        const searchInput = document.getElementById('input-mgmt-client-search');
+        this.filterMgmtClients(searchInput ? searchInput.value : '');
     },
 
     async searchFutureTasks() {
@@ -3025,6 +3095,84 @@ const App = {
         this.isExecuting = false;
         document.getElementById('btn-stop-execution').classList.add('hidden');
         document.getElementById('btn-close-progress').classList.remove('hidden');
+
+        // Optional post-deletion cleanup (Custom Properties and Contact Types)
+        const clearCustomProp = document.getElementById('input-mgmt-clear-custom-prop')?.checked;
+        const removeContactType = document.getElementById('input-mgmt-remove-contact-type')?.checked;
+        const selectedContactId = document.getElementById('select-mgmt-client')?.value;
+        const taskTypeId = document.getElementById('select-mgmt-task-type')?.value;
+
+        const clientIdsToClean = new Set();
+        if (selectedContactId) {
+            clientIdsToClean.add(parseInt(selectedContactId));
+        } else {
+            tasksToDelete.forEach(t => {
+                if (t.contactId) clientIdsToClean.add(parseInt(t.contactId));
+            });
+        }
+
+        if ((clearCustomProp || removeContactType) && clientIdsToClean.size > 0) {
+            for (const cId of clientIdsToClean) {
+                if (this.cancelExecution) break;
+                
+                let contactDetail = null;
+                try {
+                    contactDetail = await this.client.getContactById(cId);
+                } catch (e) {}
+
+                if (!contactDetail) continue;
+
+                // 1. Reset Custom Property (e.g. Fecha Contrato Mantenimiento)
+                if (clearCustomProp) {
+                    try {
+                        const cpList = contactDetail.customProperties || contactDetail.customFields || [];
+                        let targetCpId = null;
+                        if (Array.isArray(cpList)) {
+                            const matchedCp = cpList.find(cp => {
+                                const n = (cp.customPropertyName || cp.name || cp.propertyName || '').toLowerCase();
+                                return n.includes('contrat') || n.includes('manutenz') || n.includes('mantenimiento');
+                            });
+                            if (matchedCp) targetCpId = matchedCp.customPropertyTypeId || matchedCp.id;
+                        }
+                        if (targetCpId) {
+                            await this.client.updateContactCustomProperties(cId, [{
+                                customPropertyTypeId: targetCpId,
+                                dateValue: null,
+                                stringValue: null,
+                                numericValue: null
+                            }]);
+                            this.log(this.t('log.custom_prop_cleared', { id: cId }), 'success');
+                        } else {
+                            this.log(`AVVISO: Data Contratto non trovata per il cliente ${cId}.`, 'warning');
+                        }
+                    } catch (err) {
+                        this.log(this.t('log.custom_prop_err', { id: cId, msg: err.message }), 'error');
+                    }
+                }
+
+                // 2. Remove Contact Type / Typology
+                if (removeContactType && taskTypeId) {
+                    try {
+                        const currentTypes = contactDetail.contactTypes || contactDetail.types || [];
+                        const targetTypeId = parseInt(taskTypeId);
+                        const typeIds = currentTypes.map(t => typeof t === 'object' ? t.id : t);
+                        if (typeIds.includes(targetTypeId)) {
+                            const updatedTypeIds = typeIds.filter(id => id !== targetTypeId);
+                            await this.client.updateContact(cId, {
+                                id: cId,
+                                companyName: contactDetail.companyName,
+                                billingCompanyName: contactDetail.billingCompanyName,
+                                referenceCode: contactDetail.referenceCode,
+                                contactTypes: updatedTypeIds
+                            });
+                            this.log(this.t('log.contact_type_removed', { id: cId }), 'success');
+                        }
+                    } catch (err) {
+                        this.log(this.t('log.contact_type_err', { id: cId, msg: err.message }), 'error');
+                    }
+                }
+            }
+        }
 
         this.log(this.t('log.mgmt_delete_complete', { success: this.stats.success, failure: this.stats.failure }), 'info');
 
