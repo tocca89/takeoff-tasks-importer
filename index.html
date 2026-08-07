@@ -391,12 +391,13 @@
                     <div class="panel-body">
                         <div class="mgmt-grid-row">
                             <!-- Left Column: CSV Utilities -->
-                            <div class="mgmt-grid-col">
-                                <div class="mgmt-section-header">
-                                    <h4 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                                        <i class="fa-solid fa-file-csv" style="color: var(--accent);"></i>
+                            <div class="mgmt-grid-col mgmt-card">
+                                <div class="mgmt-card-header">
+                                    <h4 class="mgmt-card-title">
+                                        <i class="fa-solid fa-file-csv"></i>
                                         <span data-i18n="mgmt.csv_section">Utilidades CSV</span>
                                     </h4>
+                                    <span class="mgmt-badge-tag">CSV</span>
                                 </div>
                                 <div class="form-group" style="margin-bottom: 16px;">
                                     <button type="button" id="btn-download-last-csv" class="btn btn-secondary btn-full disabled" disabled>
@@ -411,47 +412,49 @@
                                         <span class="btn-text" data-i18n="mgmt.upload_csv_btn">Carica CSV ed Elimina</span>
                                         <span class="btn-icon-right"><i class="fa-solid fa-trash-can"></i></span>
                                     </button>
-                                    <p class="field-hint" data-i18n="mgmt.csv_hint" style="margin-top: 6px;">Sube un archivo CSV con una columna ID para eliminar tareas en lote.</p>
+                                    <p class="field-hint" data-i18n="mgmt.csv_hint" style="margin-top: 8px;">Sube un archivo CSV con una columna ID para eliminar tareas en lote.</p>
                                 </div>
                             </div>
 
-                            <div class="mgmt-grid-divider"></div>
-
-                            <!-- Right Column: Future Tasks Deletion -->
-                            <div class="mgmt-grid-col">
-                                <div class="mgmt-section-header">
-                                    <h4 style="margin-top: 0; display: flex; align-items: center; gap: 8px;">
-                                        <i class="fa-solid fa-magnifying-glass-minus" style="color: var(--accent);"></i>
+                            <!-- Right Column: Future Tasks & Client Deletion -->
+                            <div class="mgmt-grid-col mgmt-card">
+                                <div class="mgmt-card-header">
+                                    <h4 class="mgmt-card-title">
+                                        <i class="fa-solid fa-filter-circle-xmark"></i>
                                         <span data-i18n="mgmt.search_section">Buscar y Eliminar Tareas Futuras</span>
                                     </h4>
+                                    <span class="mgmt-badge-tag">CLIENTE & TIPO</span>
                                 </div>
                                 <div class="form-row">
-                                    <div class="form-group col-6" style="margin-bottom: 12px;">
+                                    <div class="form-group col-6" style="margin-bottom: 14px;">
                                         <label for="input-mgmt-client-search" data-i18n="mgmt.client_label">Cliente (Nombre, Código o ID)</label>
-                                        <input type="text" id="input-mgmt-client-search" 
-                                               list="mgmt-client-datalist"
-                                               data-i18n-placeholder="mgmt.client_search_placeholder" 
-                                               placeholder="Buscar por nombre, código o ID..." 
-                                               autocomplete="off"
-                                               style="font-size: 0.82rem; padding: 6px 10px; height: 34px; margin-bottom: 6px;">
+                                        <div class="mgmt-search-box">
+                                            <i class="fa-solid fa-magnifying-glass search-icon-inside"></i>
+                                            <input type="text" id="input-mgmt-client-search" 
+                                                   list="mgmt-client-datalist"
+                                                   data-i18n-placeholder="mgmt.client_search_placeholder" 
+                                                   placeholder="Buscar por nombre, código o ID..." 
+                                                   autocomplete="off"
+                                                   style="font-size: 0.85rem; height: 36px; margin-bottom: 6px;">
+                                        </div>
                                         <datalist id="mgmt-client-datalist"></datalist>
-                                        <select id="select-mgmt-client" style="font-size: 0.8rem;">
+                                        <select id="select-mgmt-client" style="font-size: 0.82rem; height: 36px;">
                                             <option value="" data-i18n="mgmt.client_all">Todos los clientes</option>
                                         </select>
                                     </div>
-                                    <div class="form-group col-6" style="margin-bottom: 12px;">
+                                    <div class="form-group col-6" style="margin-bottom: 14px;">
                                         <label for="select-mgmt-task-type" data-i18n="mgmt.task_type_label">Tipo de Tarea</label>
-                                        <select id="select-mgmt-task-type">
+                                        <select id="select-mgmt-task-type" style="font-size: 0.85rem; height: 36px;">
                                             <option value="" data-i18n="mgmt.task_type_placeholder">Selecciona un tipo...</option>
                                         </select>
                                     </div>
                                 </div>
                                 <div class="form-row" style="align-items: center;">
-                                    <div class="form-group col-6" style="margin-bottom: 12px;">
+                                    <div class="form-group col-6" style="margin-bottom: 14px;">
                                         <label for="input-mgmt-date-from" data-i18n="mgmt.date_from_label">A partir de la fecha</label>
-                                        <input type="date" id="input-mgmt-date-from">
+                                        <input type="date" id="input-mgmt-date-from" style="height: 36px;">
                                     </div>
-                                    <div class="form-group col-6" style="margin-bottom: 12px; display: flex; align-items: flex-end; padding-bottom: 6px;">
+                                    <div class="form-group col-6" style="margin-bottom: 14px; display: flex; align-items: flex-end; padding-bottom: 4px;">
                                         <div class="checkbox-wrapper">
                                             <label class="switch">
                                                 <input type="checkbox" id="input-mgmt-only-uncompleted" checked>
@@ -463,8 +466,8 @@
                                 </div>
 
                                 <!-- Additional Cleanup Options -->
-                                <div class="mgmt-options-box" style="margin-bottom: 16px; padding: 12px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);">
-                                    <h5 style="margin: 0 0 10px 0; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; color: var(--accent);">
+                                <div class="mgmt-options-box">
+                                    <h5 class="mgmt-options-header">
                                         <i class="fa-solid fa-sliders"></i>
                                         <span data-i18n="mgmt.options_title">Opciones Adicionales de Limpieza del Cliente</span>
                                     </h5>

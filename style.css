@@ -1736,21 +1736,104 @@ input:checked + .slider:before {
     min-width: 0;
 }
 
-.mgmt-grid-divider {
-    width: 1px;
-    background-color: var(--border-color);
-    align-self: stretch;
+/* Premium Management Cards Styling */
+.mgmt-card {
+    background: rgba(15, 23, 42, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 20px;
+    backdrop-filter: blur(12px);
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.mgmt-card:hover {
+    border-color: rgba(255, 255, 255, 0.16);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.mgmt-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.mgmt-card-title {
+    font-family: var(--font-heading);
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-color);
+}
+
+.mgmt-card-title i {
+    font-size: 1.1rem;
+    color: var(--accent);
+}
+
+.mgmt-badge-tag {
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 6px;
+    background: rgba(234, 179, 8, 0.12);
+    color: var(--accent);
+    border: 1px solid rgba(234, 179, 8, 0.25);
+}
+
+.mgmt-search-box {
+    position: relative;
+}
+
+.mgmt-search-box i.search-icon-inside {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    pointer-events: none;
+}
+
+.mgmt-search-box input {
+    padding-left: 34px !important;
+}
+
+.mgmt-options-box {
+    background: rgba(30, 41, 59, 0.45);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    transition: all 0.25s ease;
+}
+
+.mgmt-options-box:hover {
+    border-color: rgba(234, 179, 8, 0.3);
+    background: rgba(30, 41, 59, 0.6);
+}
+
+.mgmt-options-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 0 0 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 /* Responsive collapse on mobile */
 @media (max-width: 768px) {
     .mgmt-grid-row {
         flex-direction: column;
-        gap: 24px;
-    }
-    .mgmt-grid-divider {
-        width: 100%;
-        height: 1px;
-        background-color: var(--border-color);
+        gap: 20px;
     }
 }
