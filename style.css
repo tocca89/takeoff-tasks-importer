@@ -277,7 +277,7 @@ body {
     border: 1px solid var(--border-color);
     border-radius: var(--border-radius-lg);
     box-shadow: var(--shadow-premium);
-    overflow: hidden;
+    overflow: visible;
     transition: var(--transition-smooth);
 }
 
@@ -293,6 +293,8 @@ body {
     gap: 12px;
     padding: 18px 24px;
     border-bottom: 1px solid var(--border-color);
+    border-top-left-radius: var(--border-radius-lg);
+    border-top-right-radius: var(--border-radius-lg);
 }
 
 .panel-title-icon {
@@ -1008,9 +1010,9 @@ input:checked + .slider:before {
     background: var(--bg-surface-solid);
     border: 1px solid var(--border-color-focus);
     border-radius: var(--border-radius-sm);
-    box-shadow: 0 8px 24px -6px rgba(0,0,0,0.5);
-    z-index: 200;
-    max-height: 380px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.7);
+    z-index: 1000;
+    max-height: 280px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
@@ -1036,7 +1038,7 @@ input:checked + .slider:before {
 }
 
 .assignee-dropdown-list {
-    max-height: 320px;
+    max-height: 220px;
     overflow-y: auto;
     scroll-behavior: smooth;
     scrollbar-width: thin;
