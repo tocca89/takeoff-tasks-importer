@@ -194,6 +194,8 @@ const TRANSLATIONS = {
         'mgmt.upload_csv_btn': 'Subir CSV y Eliminar',
         'mgmt.csv_hint': 'Sube un archivo CSV con una columna ID para eliminar tareas en lote.',
         'mgmt.search_section': 'Buscar y Eliminar Tareas Futuras',
+        'mgmt.client_label': 'Cliente',
+        'mgmt.client_all': 'Todos los clientes',
         'mgmt.task_type_label': 'Tipo de Tarea',
         'mgmt.task_type_placeholder': 'Selecciona un tipo de tarea...',
         'mgmt.date_from_label': 'A partir de la fecha (inclusive)',
@@ -409,6 +411,8 @@ const TRANSLATIONS = {
         'mgmt.upload_csv_btn': 'Carica CSV ed Elimina',
         'mgmt.csv_hint': 'Carica un file CSV con una colonna ID per eliminare gli incarichi in blocco.',
         'mgmt.search_section': 'Cerca ed Elimina Incarichi Futuri',
+        'mgmt.client_label': 'Cliente',
+        'mgmt.client_all': 'Tutti i clienti',
         'mgmt.task_type_label': 'Tipo di Incarico',
         'mgmt.task_type_placeholder': 'Seleziona un tipo di incarico...',
         'mgmt.date_from_label': 'A partire dalla data (inclusa)',
@@ -916,6 +920,9 @@ const App = {
             const statusSpan = badge.querySelector('.status-text');
             if (statusSpan) statusSpan.textContent = this.t(isConnected ? 'status.connected' : 'status.disconnected');
         }
+
+        // Update mgmt client selector options
+        this.updateMgmtClientSelect();
     },
 
     /**
@@ -1462,8 +1469,7 @@ const App = {
             // Render individual contact list
             document.getElementById('contacts-list-section').classList.remove('hidden');
             this.renderContactList('');
-
-
+            this.updateMgmtClientSelect();
 
             document.getElementById('contacts-success-info').classList.remove('hidden');
             document.getElementById('contacts-breakdown').classList.remove('hidden');
@@ -2690,12 +2696,33 @@ const App = {
         document.getElementById('input-delete-csv-file').value = '';
     },
 
+    updateMgmtClientSelect() {
+        const select = document.getElementById('select-mgmt-client');
+        if (!select) return;
+        const currentVal = select.value;
+        select.innerHTML = `<option value="">${this.t('mgmt.client_all')}</option>`;
+        if (this.contactsData && this.contactsData.length > 0) {
+            const sorted = [...this.contactsData].sort((a, b) =>
+                (a.clientName || '').localeCompare(b.clientName || '', undefined, { sensitivity: 'base' })
+            );
+            sorted.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c.contactId;
+                opt.textContent = c.clientName ? `${c.clientName} (ID: ${c.contactId})` : `ID: ${c.contactId}`;
+                select.appendChild(opt);
+            });
+        }
+        select.value = currentVal;
+    },
+
     async searchFutureTasks() {
         const taskTypeId = document.getElementById('select-mgmt-task-type').value;
         if (!taskTypeId) {
             alert(this.t('alert.select_type_status'));
             return;
         }
+
+        const selectedContactId = document.getElementById('select-mgmt-client')?.value;
 
         const btn = document.getElementById('btn-search-future-tasks');
         const originalHtml = btn.innerHTML;
@@ -2715,14 +2742,18 @@ const App = {
             // Fetch tasks. Query up to 400 tasks of this type (two pages)
             let allTasks = [];
             for (let skip = 0; skip < 400; skip += 200) {
+                const searchPayload = {
+                    taskTypeIds: [parseInt(taskTypeId)],
+                    skip: skip,
+                    take: 200
+                };
+                if (selectedContactId) {
+                    searchPayload.contactId = parseInt(selectedContactId);
+                }
                 const response = await this.client.request('/api/tasks/search', {
                     method: 'POST',
                     headers: this.client.getHeaders(),
-                    body: JSON.stringify({
-                        taskTypeIds: [parseInt(taskTypeId)],
-                        skip: skip,
-                        take: 200
-                    })
+                    body: JSON.stringify(searchPayload)
                 });
                 if (!response.ok) break;
                 const data = await response.json();
@@ -2733,17 +2764,28 @@ const App = {
             }
 
             const dateFromInput = document.getElementById('input-mgmt-date-from').value;
-            const targetDate = dateFromInput ? new Date(dateFromInput + 'T00:00:00') : new Date();
+            const targetDate = dateFromInput ? new Date(dateFromInput + 'T00:00:00') : null;
             const onlyUncompleted = document.getElementById('input-mgmt-only-uncompleted').checked;
 
             const filtered = allTasks.filter(t => {
-                if (!t.plannedStart) return false;
-                const ps = new Date(t.plannedStart);
-                if (ps < targetDate) return false;
+                if (targetDate) {
+                    if (!t.plannedStart) return false;
+                    const ps = new Date(t.plannedStart);
+                    if (ps < targetDate) return false;
+                }
 
                 if (onlyUncompleted && this.isTaskCompleted(t)) {
                     return false;
                 }
+
+                if (selectedContactId) {
+                    const cId = parseInt(selectedContactId);
+                    const taskContactId = t.contactId || (t.contact && t.contact.id);
+                    if (taskContactId && parseInt(taskContactId) !== cId) {
+                        return false;
+                    }
+                }
+
                 return true;
             });
 
@@ -2762,6 +2804,13 @@ const App = {
                         clientName = matchedContact.clientName || matchedContact.displayName || 'N/D';
                     } else {
                         clientName = `ID Contatto: ${t.contactId}`;
+                    }
+                }
+
+                if ((clientName === 'N/D' || clientName.startsWith('ID Contatto:')) && selectedContactId) {
+                    const selOpt = document.getElementById('select-mgmt-client')?.selectedOptions[0];
+                    if (selOpt && selOpt.value) {
+                        clientName = selOpt.textContent;
                     }
                 }
 
