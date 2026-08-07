@@ -1801,10 +1801,20 @@ input:checked + .slider:before {
     color: var(--text-muted);
     font-size: 0.85rem;
     pointer-events: none;
+    z-index: 2;
 }
 
-.mgmt-search-box input {
-    padding-left: 34px !important;
+.mgmt-input-select {
+    font-size: 0.88rem !important;
+    padding: 8px 12px !important;
+    height: 42px !important;
+    min-height: 42px !important;
+    line-height: 1.4 !important;
+    box-sizing: border-box !important;
+}
+
+.mgmt-search-box input.mgmt-input-select {
+    padding-left: 36px !important;
 }
 
 .mgmt-options-box {

@@ -434,20 +434,21 @@
                                         <div class="mgmt-search-box">
                                             <i class="fa-solid fa-magnifying-glass search-icon-inside"></i>
                                             <input type="text" id="input-mgmt-client-search" 
+                                                   class="mgmt-input-select"
                                                    list="mgmt-client-datalist"
                                                    data-i18n-placeholder="mgmt.client_search_placeholder" 
                                                    placeholder="Buscar por nombre, código o ID..." 
                                                    autocomplete="off"
-                                                   style="font-size: 0.85rem; height: 36px; margin-bottom: 6px;">
+                                                   style="margin-bottom: 8px;">
                                         </div>
                                         <datalist id="mgmt-client-datalist"></datalist>
-                                        <select id="select-mgmt-client" style="font-size: 0.82rem; height: 36px;">
+                                        <select id="select-mgmt-client" class="mgmt-input-select">
                                             <option value="" data-i18n="mgmt.client_all">Todos los clientes</option>
                                         </select>
                                     </div>
                                     <div class="form-group col-6" style="margin-bottom: 14px;">
                                         <label for="select-mgmt-task-type" data-i18n="mgmt.task_type_label">Tipo de Tarea</label>
-                                        <select id="select-mgmt-task-type" style="font-size: 0.85rem; height: 36px;">
+                                        <select id="select-mgmt-task-type" class="mgmt-input-select">
                                             <option value="" data-i18n="mgmt.task_type_placeholder">Selecciona un tipo...</option>
                                         </select>
                                     </div>
@@ -455,7 +456,7 @@
                                 <div class="form-row" style="align-items: center;">
                                     <div class="form-group col-6" style="margin-bottom: 14px;">
                                         <label for="input-mgmt-date-from" data-i18n="mgmt.date_from_label">A partir de la fecha</label>
-                                        <input type="date" id="input-mgmt-date-from" style="height: 36px;">
+                                        <input type="date" id="input-mgmt-date-from" class="mgmt-input-select">
                                     </div>
                                     <div class="form-group col-6" style="margin-bottom: 14px; display: flex; align-items: flex-end; padding-bottom: 4px;">
                                         <div class="checkbox-wrapper">
