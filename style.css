@@ -1725,10 +1725,11 @@ input:checked + .slider:before {
     color: var(--text-color);
 }
 
-/* Management panel horizontal grid styling */
+/* Management panel vertical stacked grid styling */
 .mgmt-grid-row {
     display: flex;
-    gap: 32px;
+    flex-direction: column;
+    gap: 20px;
 }
 
 .mgmt-grid-col {

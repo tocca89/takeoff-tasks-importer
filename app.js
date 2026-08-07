@@ -189,6 +189,7 @@ const TRANSLATIONS = {
         // Mgmt panel
         'mgmt.title': 'Gestión y Eliminación de Tareas',
         'mgmt.csv_section': 'Utilidades CSV',
+        'mgmt.download_last_label': 'Descargar CSV de la última ejecución',
         'mgmt.download_last_btn': 'Descargar CSV Última Ejecución',
         'mgmt.upload_csv_label': 'Eliminar tareas desde archivo CSV',
         'mgmt.upload_csv_btn': 'Subir CSV y Eliminar',
@@ -414,6 +415,7 @@ const TRANSLATIONS = {
         // Mgmt panel
         'mgmt.title': 'Gestione ed Eliminazione Incarichi',
         'mgmt.csv_section': 'Utilità CSV',
+        'mgmt.download_last_label': 'Scarica CSV dell\'ultima esecuzione',
         'mgmt.download_last_btn': 'Scarica CSV Ultima Creazione',
         'mgmt.upload_csv_label': 'Elimina incarichi da file CSV',
         'mgmt.upload_csv_btn': 'Carica CSV ed Elimina',

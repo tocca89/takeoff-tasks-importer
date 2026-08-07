@@ -399,21 +399,24 @@
                                     </h4>
                                     <span class="mgmt-badge-tag">CSV</span>
                                 </div>
-                                <div class="form-group" style="margin-bottom: 16px;">
-                                    <button type="button" id="btn-download-last-csv" class="btn btn-secondary btn-full disabled" disabled>
-                                        <span class="btn-text" data-i18n="mgmt.download_last_btn">Descargar CSV Última Ejecución</span>
-                                        <span class="btn-icon-right"><i class="fa-solid fa-download"></i></span>
-                                    </button>
+                                <div class="form-row" style="align-items: flex-start;">
+                                    <div class="form-group col-6" style="margin-bottom: 8px;">
+                                        <label data-i18n="mgmt.download_last_label" style="font-size: 0.85rem; font-weight: 500; display: block; margin-bottom: 8px;">Descargar tareas de la última ejecución</label>
+                                        <button type="button" id="btn-download-last-csv" class="btn btn-secondary btn-full disabled" disabled>
+                                            <span class="btn-text" data-i18n="mgmt.download_last_btn">Descargar CSV Última Ejecución</span>
+                                            <span class="btn-icon-right"><i class="fa-solid fa-download"></i></span>
+                                        </button>
+                                    </div>
+                                    <div class="form-group col-6" style="margin-bottom: 8px;">
+                                        <label data-i18n="mgmt.upload_csv_label" style="font-size: 0.85rem; font-weight: 500; display: block; margin-bottom: 8px;">Eliminar tareas desde archivo CSV</label>
+                                        <input type="file" id="input-delete-csv-file" accept=".csv,.txt" style="display:none;">
+                                        <button type="button" id="btn-trigger-file-upload" class="btn btn-warning btn-full">
+                                            <span class="btn-text" data-i18n="mgmt.upload_csv_btn">Carica CSV ed Elimina</span>
+                                            <span class="btn-icon-right"><i class="fa-solid fa-trash-can"></i></span>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div class="form-group">
-                                    <label data-i18n="mgmt.upload_csv_label" style="font-size: 0.85rem; font-weight: 500; display: block; margin-bottom: 8px;">Eliminar tareas desde archivo CSV</label>
-                                    <input type="file" id="input-delete-csv-file" accept=".csv,.txt" style="display:none;">
-                                    <button type="button" id="btn-trigger-file-upload" class="btn btn-warning btn-full">
-                                        <span class="btn-text" data-i18n="mgmt.upload_csv_btn">Carica CSV ed Elimina</span>
-                                        <span class="btn-icon-right"><i class="fa-solid fa-trash-can"></i></span>
-                                    </button>
-                                    <p class="field-hint" data-i18n="mgmt.csv_hint" style="margin-top: 8px;">Sube un archivo CSV con una columna ID para eliminar tareas en lote.</p>
-                                </div>
+                                <p class="field-hint" data-i18n="mgmt.csv_hint" style="margin-top: 4px; margin-bottom: 0;">Sube un archivo CSV con una columna ID para eliminar tareas en lote.</p>
                             </div>
 
                             <!-- Right Column: Future Tasks & Client Deletion -->
