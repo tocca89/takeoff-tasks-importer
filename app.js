@@ -836,6 +836,19 @@ const App = {
     // date. Matched case-insensitively; the first one found on the contact
     // wins. Add aliases here if the field is named differently in TakeOff.
     contractDatePropNames: [
+        '01. Fecha Contrato Mantenimiento',
+        '01. Fecha de Contrato Mantenimiento',
+        '01. Fecha Contrato de Mantenimiento',
+        '01. Fecha Contrato',
+        '01. Fecha de Contrato',
+        '01. Fecha Inicio Contrato',
+        '01. Fecha de Inicio Contrato',
+        '01. Fecha de Inicio Contrato Mantenimiento',
+        '01. Fecha Inicio Contrato Mantenimiento',
+        '01. Data inizio manutenzione',
+        '01. Data contratto manutenzione',
+        '01. Data inizio contratto',
+        '01. Data Contratto',
         'Fecha Contrato Mantenimiento',
         'Fecha de Contrato Mantenimiento',
         'Fecha Contrato de Mantenimiento',
@@ -1658,6 +1671,10 @@ const App = {
             return str.replace(/\b(de|di|del|della|dello)\b/g, ' ').replace(/\s+/g, ' ').trim();
         };
 
+        const stripLeadingIndex = (str) => {
+            return str.replace(/^\d+[\.\-\s_:]+\s*/, '').trim();
+        };
+
         const targetSet = new Set();
         const flexTargetSet = new Set();
 
@@ -1666,7 +1683,11 @@ const App = {
             const norm = normalize(p);
             if (norm) {
                 targetSet.add(norm);
-                flexTargetSet.add(stripPrepositions(norm));
+                const flex = stripPrepositions(norm);
+                flexTargetSet.add(flex);
+                const noIndex = stripLeadingIndex(norm);
+                flexTargetSet.add(noIndex);
+                flexTargetSet.add(stripPrepositions(noIndex));
             }
         }
 
@@ -1697,6 +1718,10 @@ const App = {
             if (targetSet.has(norm)) return true;
             const flexNorm = stripPrepositions(norm);
             if (flexTargetSet.has(flexNorm)) return true;
+            const noIndexNorm = stripLeadingIndex(norm);
+            if (targetSet.has(noIndexNorm) || flexTargetSet.has(noIndexNorm)) return true;
+            const noIndexFlex = stripPrepositions(noIndexNorm);
+            if (flexTargetSet.has(noIndexFlex)) return true;
             return false;
         };
 
